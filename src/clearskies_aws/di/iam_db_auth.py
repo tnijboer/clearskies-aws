@@ -1,7 +1,5 @@
 import clearskies
 import os
-
-
 class IAMDBAuth(clearskies.di.AdditionalConfig):
     _boto3 = None
     _environment = None

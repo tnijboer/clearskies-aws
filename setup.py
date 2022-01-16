@@ -39,8 +39,5 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.6",
-    install_requires=[
-        'boto3',
-        'clear-skies'
-    ],
+    install_requires=['boto3', 'clear-skies'],
 )

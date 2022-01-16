@@ -51,13 +51,7 @@ class LambdaAPIGatewayTest(unittest.TestCase):
         self.assertFalse(aws_lambda.has_request_header('bearer'))
 
     def test_body_plain(self):
-        aws_lambda = LambdaAPIGateway({
-            **self.dummy_event,
-            **{
-                'body': '{"hey": "sup"}',
-                'isBase64Encoded': False
-            }
-        }, {})
+        aws_lambda = LambdaAPIGateway({**self.dummy_event, **{'body': '{"hey": "sup"}', 'isBase64Encoded': False}}, {})
 
         self.assertEquals({'hey': 'sup'}, aws_lambda.json_body())
         self.assertEquals('{"hey": "sup"}', aws_lambda.get_body())

@@ -16,7 +16,7 @@ class SecretsManager:
             'VersionId': version_id,
             'VersionStage': version_stage,
         }
-        calling_parameters = {key: value for (key,value) in calling_parameters.items() if value}
+        calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
         result = self._secrets_manager.get_secret_value(**calling_parameters)
         if result.get('SecretString'):
             return result.get('SecretString')
