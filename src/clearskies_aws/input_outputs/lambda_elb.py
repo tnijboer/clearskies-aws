@@ -1,5 +1,5 @@
-from .aws_lambda_api_gateway import AWSLambdaAPIGateway
-class AWSLambdaELB(AWSLambdaAPIGateway):
+from .lambda_api_gateway import LambdaAPIGateway
+class LambdaELB(LambdaAPIGateway):
     _event = None
     _context = None
     _request_headers = None

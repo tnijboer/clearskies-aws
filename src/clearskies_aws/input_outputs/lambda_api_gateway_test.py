@@ -1,7 +1,7 @@
 import unittest
-from .aws_lambda_api_gateway import AWSLambdaAPIGateway
+from .lambda_api_gateway import LambdaAPIGateway
 from collections import OrderedDict
-class AWSLambdaAPIGatewayTest(unittest.TestCase):
+class LambdaAPIGatewayTest(unittest.TestCase):
     dummy_event = {
         'httpMethod': 'GET',
         'path': '/test',
@@ -17,7 +17,7 @@ class AWSLambdaAPIGatewayTest(unittest.TestCase):
     }
 
     def test_respond(self):
-        aws_lambda = AWSLambdaAPIGateway(self.dummy_event, {})
+        aws_lambda = LambdaAPIGateway(self.dummy_event, {})
         aws_lambda.set_headers({'bob': 'hey', 'jane': 'kay'})
         aws_lambda.set_header('hey', 'sup')
         aws_lambda.clear_header('bob')
@@ -34,7 +34,7 @@ class AWSLambdaAPIGatewayTest(unittest.TestCase):
         }, response)
 
     def test_headers(self):
-        aws_lambda = AWSLambdaAPIGateway({
+        aws_lambda = LambdaAPIGateway({
             **self.dummy_event,
             **{
                 'headers': {
@@ -51,7 +51,7 @@ class AWSLambdaAPIGatewayTest(unittest.TestCase):
         self.assertFalse(aws_lambda.has_request_header('bearer'))
 
     def test_body_plain(self):
-        aws_lambda = AWSLambdaAPIGateway({
+        aws_lambda = LambdaAPIGateway({
             **self.dummy_event,
             **{
                 'body': '{"hey": "sup"}',
@@ -64,7 +64,7 @@ class AWSLambdaAPIGatewayTest(unittest.TestCase):
         self.assertTrue(aws_lambda.has_body())
 
     def test_body_base64(self):
-        aws_lambda = AWSLambdaAPIGateway({
+        aws_lambda = LambdaAPIGateway({
             **self.dummy_event,
             **{
                 'body': 'eyJoZXkiOiAic3VwIn0=',
@@ -77,9 +77,9 @@ class AWSLambdaAPIGatewayTest(unittest.TestCase):
         self.assertTrue(aws_lambda.has_body())
 
     def test_path(self):
-        aws_lambda = AWSLambdaAPIGateway(self.dummy_event, {})
+        aws_lambda = LambdaAPIGateway(self.dummy_event, {})
         self.assertEquals('/test', aws_lambda.get_path_info())
 
     def test_query_string(self):
-        aws_lambda = AWSLambdaAPIGateway(self.dummy_event, {})
+        aws_lambda = LambdaAPIGateway(self.dummy_event, {})
         self.assertEquals('q=hey&bob=sup', aws_lambda.get_query_string())

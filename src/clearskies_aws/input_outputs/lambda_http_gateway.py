@@ -1,5 +1,5 @@
-from .aws_lambda_api_gateway import AWSLambdaAPIGateway
-class AWSHttpAPIGateway(AWSLambdaAPIGateway):
+from .lambda_api_gateway import LambdaAPIGateway
+class LambdaHTTPGateway(LambdaAPIGateway):
     def __init__(self, event, context):
         self._event = event
         self._context = context

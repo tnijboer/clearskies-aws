@@ -2,7 +2,7 @@ from clearskies.input_outputs.input_output import InputOutput
 import json
 import base64
 import urllib
-class AWSLambdaAPIGateway(InputOutput):
+class LambdaAPIGateway(InputOutput):
     _event = None
     _context = None
     _request_headers = None

@@ -1,3 +1,4 @@
-from .aws_http_api_gateway import aws_http_api_gateway
-from .aws_lambda_api_gateway import aws_lambda_api_gateway
-from .aws_lambda_elb import aws_lambda_elb
+from .lambda_api_gateway import lambda_api_gateway
+from .lambda_elb import lambda_elb
+from .lambda_http_gateway import lambda_http_gateway
+from .lambda_invocation import lambda_invocation

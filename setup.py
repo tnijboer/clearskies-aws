@@ -35,7 +35,7 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
     ],
-    keywords='setuptools development microservices',
+    keywords='setuptools development',
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.6",

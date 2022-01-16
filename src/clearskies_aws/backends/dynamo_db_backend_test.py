@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from decimal import Decimal
 from .dynamo_db_backend import DynamoDBBackend
 import clearskies
+from ..di import StandardDependencies
 from boto3.dynamodb import conditions as dynamodb_conditions
 class User(clearskies.Model):
     def __init__(self, dynamo_db_backend, columns):
@@ -24,7 +25,7 @@ class Users(clearskies.Models):
         return User
 class DynamoDBBackendTest(unittest.TestCase):
     def setUp(self):
-        self.di = clearskies.di.StandardDependencies()
+        self.di = StandardDependencies()
         self.di.bind('environment', {'AWS_REGION': 'us-east-2'})
         self.dynamo_db_table = SimpleNamespace(
             key_schema=[{
