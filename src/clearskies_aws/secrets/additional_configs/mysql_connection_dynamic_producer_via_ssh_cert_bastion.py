@@ -1,10 +1,10 @@
-from clearskies.secrets.additional_configs import MySQLConnectionDynamicProducerViaSSHCertBastionAdditionalConfig as Base
+from clearskies.secrets.additional_configs import MySQLConnectionDynamicProducerViaSSHCertBastion as Base
 from pathlib import Path
 import socket
 import subprocess
 import os
 import time
-class MySQLConnectionDynamicProducerViaSSHCertBastionAdditionalConfig(Base):
+class MySQLConnectionDynamicProducerViaSSHCertBastion(Base):
     _config = None
     _boto3 = None
 
