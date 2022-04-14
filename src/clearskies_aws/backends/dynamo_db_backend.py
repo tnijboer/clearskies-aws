@@ -126,10 +126,20 @@ class DynamoDBBackend(Backend):
         pass
 
     def update(self, id, data, model):
+        # when we run an update column we must include the sort column on the primary
+        # index (if it exists)
+        sort_column_name = self._find_primary_sort_column(model)
+        key = {model.id_column_name: model.__getattr__(model.id_column_name)}
+        if sort_column_name:
+            key[sort_column_name] = data.get(
+                sort_column_name,
+                model.columns()[sort_column_name].to_backend(model._data)
+            )
         table = self._dynamodb.Table(model.table_name())
+
         updated = table.update_item(
-            Key={model.id_column_name: model.__getattr__(model.id_column_name)},
-            UpdateExpression=','.join([f"set {column_name} = :{column_name}" for column_name in data.keys()]),
+            Key=key,
+            UpdateExpression='SET ' + ', '.join([f"{column_name} = :{column_name}" for column_name in data.keys()]),
             ExpressionAttributeValues={
                 **{f':{column_name}': value
                    for (column_name, value) in data.items()},
@@ -477,6 +487,17 @@ class DynamoDBBackend(Backend):
 
         self._table_indexes[model.table_name()] = table_indexes
         return table_indexes
+
+    def _find_primary_sort_column(self, model):
+        indexes = self._get_indexes_for_model(model)
+        primary_indexes = indexes.get(model.id_column_name)
+        if not primary_indexes:
+            return None
+        for (column_name, index_name) in primary_indexes['sortable_columns'].items():
+            # the primary index doesn't have a name, so we want the record with a name of None
+            if index_name is None:
+                return column_name
+        return None
 
     def _map_from_boto3(self, record):
         return {key: self._map_from_boto3_value(value) for (key, value) in record.items()}
