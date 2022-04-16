@@ -21,3 +21,9 @@ class SecretsManager:
         if result.get('SecretString'):
             return result.get('SecretString')
         return result.get('SecretBinary')
+
+    def list_secrets(self, path):
+        raise NotImplementedError()
+
+    def update(self, path, value):
+        raise NotImplementedError()

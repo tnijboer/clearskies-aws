@@ -13,3 +13,16 @@ class ParameterStore:
     def get(self, path):
         result = self._ssm.get_parameter(Name=path, WithDecryption=True)
         return result['Parameter']['Value']
+
+    def list_secrets(self, path):
+        response = self._ssm.get_parameters_by_path(Path=path, Recursive=False)
+        return [parameter['Name'] for parameter in response['Parameters']]
+
+    def update(self, path, value):
+        response = self._ssm.put_parameter(
+            Name=path,
+            Value=value,
+            Type='String',
+            Overwrite=True,
+        )
+        return True

@@ -116,7 +116,7 @@ class DynamoDBBackend(Backend):
         self._boto3 = boto3
         self._environment = environment
         if not environment.get('AWS_REGION', True):
-            raise ValueError('To use DynamoDB you must use set the AWS_REGION environment variable')
+            raise ValueError('To use DynamoDB you must use set AWS_REGION in the .env file or an environment variable')
 
         self._dynamodb = self._boto3.resource('dynamodb', region_name=environment.get('AWS_REGION', True))
         self._table_indexes = {}
