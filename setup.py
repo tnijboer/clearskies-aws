@@ -18,7 +18,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='clear-skies-aws',
-    version='1.1.0',
+    version='1.1.1',
     description='clearskies bindings for working in AWS',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -39,5 +39,5 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.6",
-    install_requires=['boto3', 'clear-skies'],
+    install_requires=['boto3', 'clear-skies', 'akeyless-cloud-id'],
 )
