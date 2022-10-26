@@ -168,7 +168,9 @@ class DynamoDBBackend(Backend):
                 next_page_data: Dict[str, str] = None) -> List[Dict[str, Any]]:
         response = self._dynamodb_query(configuration, model, 'ALL_ATTRIBUTES')
         if 'LastEvaluatedKey' in response and response['LastEvaluatedKey'] is not None and type(next_page_data) == dict:
-            next_page_data['next_token'] = self.serialize_next_token_for_response(response['LastEvaluatedKey'])
+            next_page_data['next_token'] = self.serialize_next_token_for_response(
+                self._map_from_boto3(response['LastEvaluatedKey'])
+            )
         return [self._map_from_boto3(item) for item in response['Items']]
 
     def _dynamodb_query(self, configuration, model, select_type):
