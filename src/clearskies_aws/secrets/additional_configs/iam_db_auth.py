@@ -1,7 +1,15 @@
 import clearskies
 import os
 class IAMDBAuth(clearskies.di.AdditionalConfig):
+    def provide_boto3(self):
+        import boto3
+        return boto3
+
     def provide_connection_details(self, environment, boto3):
+        """
+        I really need to make these configurable - both the values themselves and the environment
+        variables that things get pulled from.
+        """
         endpoint = environment.get('db_endpoint')
         username = environment.get('db_username')
         database = environment.get('db_database')
