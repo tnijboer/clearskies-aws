@@ -23,7 +23,19 @@ class SecretsManager:
         return result.get('SecretBinary')
 
     def list_secrets(self, path):
-        raise NotImplementedError()
+        results = self._secrets_manager.list_secrets(Filters=[
+            {
+                'Key': 'name',
+                'Values': [path],
+            },
+        ], )
+        return results['SecretList']
 
-    def update(self, path, value):
-        raise NotImplementedError()
+    def update(self, secret_id, value, kms_key_id=None):
+        calling_parameters = {
+            'SecretId': secret_id,
+            'SecretString': value,
+            'KmsKeyId': kms_key_id,
+        }
+        calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
+        result = self._secrets_manager.update_secret(**calling_parameters)
