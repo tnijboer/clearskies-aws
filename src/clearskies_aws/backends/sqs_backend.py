@@ -13,7 +13,7 @@ class SqsBackend(Backend):
     Note that this is a *write-only* backend.  Reading from an SQS queue is different enough from
     the way that clearskies models works that it doesn't make sense to try to make those happen here.
 
-    See the SQS contexts in this library for processing your queue data.
+    See the SQS context in this library for processing your queue data.
     """
 
     _boto3 = None
@@ -41,8 +41,10 @@ class SqsBackend(Backend):
         pass
 
     def create(self, data, model):
-        table = self._dynamodb.Table(model.table_name())
-        table.put_item(Item=data)
+        self._sqs.send_message(
+            QueueUrl=model.table_name(),
+            MessageBody=json.dumps(data),
+        )
         return {**data}
 
     def update(self, id, data, model):
