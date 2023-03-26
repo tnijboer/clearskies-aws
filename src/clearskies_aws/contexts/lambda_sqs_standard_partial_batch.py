@@ -1,10 +1,17 @@
-from ..input_outputs import SqsStandardQueue as SqsStandardQueueInputOutput
+from ..input_outputs import LambdaSqsStandard as LambdaSqsStandardInputOutput
 from ..di import StandardDependencies
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
-class LambdaSqsStandardQueuePartialBatch(Context):
+from clearskies.authentication import public
+class LambdaSqsStandardPartialBatch(Context):
     def __init__(self, di):
         super().__init__(di)
+
+    def finalize_handler_config(self, config):
+        return {
+            'authentication': public(),
+            **config,
+        }
 
     def __call__(self, event, context):
         if self.handler is None:
@@ -13,9 +20,8 @@ class LambdaSqsStandardQueuePartialBatch(Context):
         item_failures = []
         for record in event['Records']:
             try:
-                self.handler(SqsStandardQueueInputOutput(record, context))
+                self.handler(LambdaSqsStandardInputOutput(record['body'], context))
             except Exception as e:
-                print("Error for record " + record['messageId'] + ": " + str(e))
                 item_failures.append({'itemIdentifier': record['messageId']})
 
         if item_failures:
@@ -23,7 +29,7 @@ class LambdaSqsStandardQueuePartialBatch(Context):
                 "batchItemFailures": item_failures,
             }
         return {}
-def lambda_sqs_standard_queue_partial_batch(
+def lambda_sqs_standard_partial_batch(
     application,
     di_class=StandardDependencies,
     bindings=None,
@@ -32,7 +38,7 @@ def lambda_sqs_standard_queue_partial_batch(
     additional_configs=None,
 ):
     return build_context(
-        SqsStandardQueue,
+        LambdaSqsStandardPartialBatch,
         application,
         di_class=di_class,
         bindings=bindings,
