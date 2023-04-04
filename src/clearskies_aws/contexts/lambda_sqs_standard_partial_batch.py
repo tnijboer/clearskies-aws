@@ -22,6 +22,7 @@ class LambdaSqsStandardPartialBatch(Context):
             try:
                 self.handler(LambdaSqsStandardInputOutput(record['body'], context))
             except Exception as e:
+                print('Failed message ' + record['messageId'] + ' being returned for retry.  Error error: ' + str(e))
                 item_failures.append({'itemIdentifier': record['messageId']})
 
         if item_failures:
