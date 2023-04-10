@@ -10,6 +10,9 @@ class ParameterStore:
             raise ValueError("To use parameter store you must use set the 'AWS_REGION' environment variable")
         self._ssm = self._boto3.client('ssm', region_name=self._environment.get('AWS_REGION'))
 
+    def create(self, path, value):
+        return self.update(path, value)
+
     def get(self, path):
         result = self._ssm.get_parameter(Name=path, WithDecryption=True)
         return result['Parameter']['Value']
@@ -26,3 +29,6 @@ class ParameterStore:
             Overwrite=True,
         )
         return True
+
+    def upsert(self, path, value):
+        return self.update(path, value)

@@ -10,6 +10,15 @@ class SecretsManager:
             raise ValueError("To use secrets manager you must use set the 'AWS_REGION' environment variable")
         self._secrets_manager = self._boto3.client('secretsmanager', region_name=self._environment.get('AWS_REGION'))
 
+    def create(self, secret_id, value, kms_key_id=None):
+        calling_parameters = {
+            'SecretId': secret_id,
+            'SecretString': value,
+            'KmsKeyId': kms_key_id,
+        }
+        calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
+        result = self._secrets_manager.create_secret(**calling_parameters)
+
     def get(self, secret_id, version_id=None, version_stage=None):
         calling_parameters = {
             'SecretId': secret_id,
@@ -39,3 +48,12 @@ class SecretsManager:
         }
         calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
         result = self._secrets_manager.update_secret(**calling_parameters)
+
+    def upsert(self, secret_id, value, kms_key_id=None):
+        calling_parameters = {
+            'SecretId': secret_id,
+            'SecretString': value,
+            'KmsKeyId': kms_key_id,
+        }
+        calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
+        result = self._secrets_manager.put_secret_value(**calling_parameters)
