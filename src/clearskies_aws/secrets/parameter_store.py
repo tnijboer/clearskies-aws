@@ -1,3 +1,5 @@
+from botocore.exceptions import ClientError
+from clearskies.secrets.exceptions import NotFound
 class ParameterStore:
     _boto3 = None
     _environment = None
@@ -13,8 +15,17 @@ class ParameterStore:
     def create(self, path, value):
         return self.update(path, value)
 
-    def get(self, path):
-        result = self._ssm.get_parameter(Name=path, WithDecryption=True)
+    def get(self, path, silent_if_not_found=False):
+        try:
+            result = self._ssm.get_parameter(Name=path, WithDecryption=True)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                if silent_if_not_found:
+                    return None
+                raise NotFound(
+                    f"Cound not find secret '{secret_id}' with version '{version}' and stage '{version_stage}'"
+                )
+            raise e
         return result['Parameter']['Value']
 
     def list_secrets(self, path):

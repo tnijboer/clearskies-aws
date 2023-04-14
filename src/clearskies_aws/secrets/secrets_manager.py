@@ -1,3 +1,5 @@
+from botocore.exceptions import ClientError
+from clearskies.secrets.exceptions import NotFound
 class SecretsManager:
     _boto3 = None
     _environment = None
@@ -19,14 +21,23 @@ class SecretsManager:
         calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
         result = self._secrets_manager.create_secret(**calling_parameters)
 
-    def get(self, secret_id, version_id=None, version_stage=None):
+    def get(self, secret_id, version_id=None, version_stage=None, silent_if_not_found=False):
         calling_parameters = {
             'SecretId': secret_id,
             'VersionId': version_id,
             'VersionStage': version_stage,
         }
         calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
-        result = self._secrets_manager.get_secret_value(**calling_parameters)
+        try:
+            result = self._secrets_manager.get_secret_value(**calling_parameters)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                if silent_if_not_found:
+                    return None
+                raise NotFound(
+                    f"Cound not find secret '{secret_id}' with version '{version}' and stage '{version_stage}'"
+                )
+            raise e
         if result.get('SecretString'):
             return result.get('SecretString')
         return result.get('SecretBinary')
