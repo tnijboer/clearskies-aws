@@ -139,10 +139,14 @@ class DynamoDBBackend(Backend):
 
         updated = table.update_item(
             Key=key,
-            UpdateExpression='SET ' + ', '.join([f"{column_name} = :{column_name}" for column_name in data.keys()]),
+            UpdateExpression='SET ' + ', '.join([f"#{column_name} = :{column_name}" for column_name in data.keys()]),
             ExpressionAttributeValues={
                 **{f':{column_name}': value
                    for (column_name, value) in data.items()},
+            },
+            ExpressionAttributeNames={
+                **{f'#{column_name}': column_name
+                   for column_name in data.keys()},
             },
             ReturnValues="ALL_NEW",
         )

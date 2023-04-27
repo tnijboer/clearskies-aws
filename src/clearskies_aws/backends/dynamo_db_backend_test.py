@@ -124,10 +124,14 @@ class DynamoDBBackendTest(unittest.TestCase):
         self.dynamo_db.Table.assert_called_with('users')
         self.dynamo_db_table.update_item.assert_called_with(
             Key={'id': '1-2-3-4'},
-            UpdateExpression='SET name = :name, age = :age',
+            UpdateExpression='SET #name = :name, #age = :age',
             ExpressionAttributeValues={
                 ':name': 'hello',
                 ':age': 10
+            },
+            ExpressionAttributeNames={
+                '#name': 'name',
+                '#age': 'age'
             },
             ReturnValues="ALL_NEW",
         )
