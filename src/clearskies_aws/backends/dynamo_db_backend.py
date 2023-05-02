@@ -559,7 +559,7 @@ class DynamoDBBackend(Backend):
         return base64.urlsafe_b64encode(json.dumps(last_evaluated_key).encode('utf-8')).decode('utf8')
 
     def documentation_pagination_next_page_response(self, case_mapping: Callable) -> List[Any]:
-        return [AutoDocString(case_mapping('next_token'), example='eyJpZCI6IHsiUyI6ICIzODM0MyJ9fQ==')]
+        return [AutoDocString(case_mapping('next_token'))]
 
     def documentation_pagination_next_page_example(self, case_mapping: Callable) -> Dict[str, Any]:
         return {case_mapping('next_token'): 'eyJpZCI6IHsiUyI6ICIzODM0MyJ9fQ=='}
