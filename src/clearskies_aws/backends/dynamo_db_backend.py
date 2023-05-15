@@ -3,6 +3,7 @@ from boto3.dynamodb import conditions as dynamodb_conditions
 from decimal import Decimal
 from clearskies.column_types.float import Float
 from clearskies.column_types.integer import Integer
+from clearskies.column_types.boolean import Boolean
 import json
 import base64
 from typing import Any, Callable, Dict, List, Tuple
@@ -569,3 +570,28 @@ class DynamoDBBackend(Backend):
             AutoDocString(case_mapping('next_token'),
                           example='eyJpZCI6IHsiUyI6ICIzODM0MyJ9fQ=='), 'A token to fetch the next page of results'
         )]
+
+    def column_from_backend(self, column, value):
+        """
+        We have a couple columns we want to override transformations for
+        """
+        # We're pretty much ignoring the BOOL type for dynamodb, because it doesn't work in indexes
+        # (and 99% of the time when I have a boolean, it gets used in an index).  Therefore,
+        # convert boolean values to "0", "1".
+        if isinstance(column, Boolean):
+            if value == "1":
+                return True
+            elif value == "0":
+                return False
+            else:
+                return bool(value)
+        return super().column_from_backend(column, value)
+
+    def column_to_backend(self, column, backend_data):
+        """
+        We have a couple columns we want to override transformations for
+        """
+        # most importantly, there's no need to transform a JSON column in either direction
+        if isinstance(column, Boolean):
+            return "1" if bool(backend_data) else "0"
+        return column.to_backend(backend_data)
