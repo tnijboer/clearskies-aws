@@ -1,7 +1,6 @@
 from typing import List
 import datetime
 import clearskies
-import jinja2
 from botocore.exceptions import ClientError
 from collections.abc import Sequence
 class SES:
@@ -71,15 +70,19 @@ class SES:
             )
 
         if subject_template_file:
+            import jinja2
             with open(subject_template, "r", encoding="utf-8") as template:
                 self.subject_template = jinja2.Template(template.read())
         elif subject_template:
+            import jinja2
             self.subject_template = jinja2.Template(subject_template)
 
         if message_template_file:
+            import jinja2
             with open(message_template, "r", encoding="utf-8") as template:
                 self.message_template = jinja2.Template(template.read())
         elif message_template:
+            import jinja2
             self.message_template = jinja2.Template(message_template)
 
         self.assume_role = assume_role
