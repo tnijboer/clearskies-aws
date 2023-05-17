@@ -593,5 +593,8 @@ class DynamoDBBackend(Backend):
         """
         # most importantly, there's no need to transform a JSON column in either direction
         if isinstance(column, Boolean):
-            return "1" if bool(backend_data) else "0"
+            if column.name not in backend_data:
+                continue
+            as_string = "1" if bool(backend_data[column.name]) else "0"
+            return {**backend_data, column.name: as_string}
         return column.to_backend(backend_data)
