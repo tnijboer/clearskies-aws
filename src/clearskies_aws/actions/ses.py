@@ -71,7 +71,7 @@ class SES:
 
         if subject_template_file:
             import jinja2
-            with open(subject_template, "r", encoding="utf-8") as template:
+            with open(subject_template_file, "r", encoding="utf-8") as template:
                 self.subject_template = jinja2.Template(template.read())
         elif subject_template:
             import jinja2
@@ -79,7 +79,7 @@ class SES:
 
         if message_template_file:
             import jinja2
-            with open(message_template, "r", encoding="utf-8") as template:
+            with open(message_template_file, "r", encoding="utf-8") as template:
                 self.message_template = jinja2.Template(template.read())
         elif message_template:
             import jinja2
