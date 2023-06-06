@@ -3,6 +3,8 @@ import datetime
 import clearskies
 from botocore.exceptions import ClientError
 from collections.abc import Sequence
+from collections import OrderedDict
+import json
 class SQS:
     def __init__(self, environment, boto3, di):
         self.environment = environment
@@ -16,12 +18,14 @@ class SQS:
         queue_url_callable=None,
         message_callable=None,
         when=None,
+        assume_role=None,
     ) -> None:
         self.when = when
         self.message_callable = message_callable
         self.queue_url = queue_url
-        self.queue_url_environment_key = self.queue_url_environment_key
-        self.queue_url_callable = self.queue_url_callable
+        self.queue_url_environment_key = queue_url_environment_key
+        self.queue_url_callable = queue_url_callable
+        self.assume_role = assume_role
 
         if self.message_callable and not callable(self.message_callable):
             raise ValueError(
@@ -57,7 +61,7 @@ class SQS:
             MessageBody=self.get_message_body(model),
         )
 
-    def get_queue_url(self):
+    def get_queue_url(self, model):
         if self.queue_url:
             return self.queue_url
         if self.queue_url_environment_key:
@@ -66,13 +70,19 @@ class SQS:
 
     def get_message_body(self, model):
         if self.message_callable:
-            return self.di.call_function(self.message_callable, model=model)
-        #json = OrderedDict()
-        #for (output_name, column) in self._as_json_map.items():
-        #column_data = column.to_json(model)
-        #if type(column_data) == dict:
-        #for (key, value) in column_data.items():
-        #json[self.auto_case_column_name(key, True)] = value
-        #else:
-        #json[output_name] = column_data
-        #return json
+            result = self.di.call_function(self.message_callable, model=model)
+            if type(result) == dict or type(result) == list:
+                return json.dumps(result)
+            if type(result) != str:
+                raise TypeError(
+                    "The return value from the message callable for the SQS action must be a string, dictionary, or list.   I received a "
+                    + type(result) + " after calling '" + self.message_callable.__name__ + "'"
+                )
+            return result
+
+        model_data = OrderedDict()
+        for (column_name, column) in model.columns().items():
+            if not column.is_readable:
+                continue
+            model_data[column_name] = column.to_json(model)
+        return json.dumps(model_data)
