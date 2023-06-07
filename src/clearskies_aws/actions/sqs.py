@@ -1,10 +1,11 @@
-from typing import List
+from typing import List, Optional, Callable
 import datetime
 import clearskies
 from botocore.exceptions import ClientError
 from collections.abc import Sequence
 from collections import OrderedDict
 import json
+from . import assume_role
 class SQS:
     def __init__(self, environment, boto3, di):
         self.environment = environment
@@ -13,12 +14,12 @@ class SQS:
 
     def configure(
         self,
-        queue_url=None,
-        queue_url_environment_key=None,
-        queue_url_callable=None,
-        message_callable=None,
-        when=None,
-        assume_role=None,
+        queue_url='',
+        queue_url_environment_key='',
+        queue_url_callable: Optional[Callable] = None,
+        message_callable: Optional[Callable] = None,
+        when: Optional[Callable] = None,
+        assume_role: Optional[assume_role.AssumeRole] = None,
     ) -> None:
         self.when = when
         self.message_callable = message_callable
@@ -71,9 +72,9 @@ class SQS:
     def get_message_body(self, model):
         if self.message_callable:
             result = self.di.call_function(self.message_callable, model=model)
-            if type(result) == dict or type(result) == list:
+            if isinstance(result, dict) or isinstance(result, list):
                 return json.dumps(result)
-            if type(result) != str:
+            if not isinstance(result, str):
                 raise TypeError(
                     "The return value from the message callable for the SQS action must be a string, dictionary, or list.   I received a "
                     + type(result) + " after calling '" + self.message_callable.__name__ + "'"
