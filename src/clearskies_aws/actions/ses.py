@@ -3,10 +3,10 @@ import datetime
 import clearskies
 from botocore.exceptions import ClientError
 from collections.abc import Sequence
-class SES:
-    def __init__(self, boto3, di):
-        self.boto3 = boto3
-        self.di = di
+class SES(ActionAws):
+    def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
+        """Setup action."""
+        super().__init__(environment, boto3, di)
 
     def configure(
         self,
