@@ -1,8 +1,10 @@
-from typing import Optional
 import clearskies
+
+from typing import Optional
+
 from .assume_role import AssumeRole
 from .ses import SES
-#from .sns import SNS
+from .sns import SNS
 from .sqs import SQS
 def ses(
     sender,
@@ -33,6 +35,21 @@ def ses(
         message_template_file=message_template_file,
         assume_role=assume_role,
         dependencies_for_template=dependencies_for_template,
+        when=when,
+    )
+def sns(
+    topic=None,
+    topic_environment_key=None,
+    topic_callable=None,
+    message_callable=None,
+    when=None,
+):
+    return clearskies.BindingConfig(
+        SNS,
+        topic=topic,
+        topic_environment_key=topic_environment_key,
+        topic_callable=topic_callable,
+        message_callable=message_callable,
         when=when,
     )
 def sqs(
@@ -66,3 +83,4 @@ def assume_role(
         duration=duration,
         source=source,
     )
+__all__ = [assume_role, AssumeRole, ses, SES, sns, SNS, sqs, SQS]

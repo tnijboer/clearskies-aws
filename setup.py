@@ -39,5 +39,9 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.6",
-    install_requires=['boto3', 'clear-skies', 'akeyless-cloud-id'],
+    install_requires=['boto3', 'clear-skies', 'boto3-stubs'],
+    extra_requires={
+        "Akeyless": ['akeyless-cloud-id', 'akeyless'],
+        "SES": ["jinja2"]
+    }
 )
