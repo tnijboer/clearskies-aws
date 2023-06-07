@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 from collections.abc import Sequence
 from clearskies.environment import Environment
 from clearskies.models import Models
-from mypy_boto3_sns import SNSClient
+from types import ModuleType
 from typing import List, Optional, Callable, cast
 
 from ..di import StandardDependencies
@@ -44,7 +44,7 @@ class SNS(ActionAws):
         if not topics:
             raise ValueError("You must provide at least one of 'topic', 'topic_environment_key', or 'topic_callable'.")
 
-    def _execute_action(self, client: SNSClient, model: Models) -> None:
+    def _execute_action(self, client: ModuleType, model: Models) -> None:
         """Send a notification as configured."""
         try:
             client.publish(
