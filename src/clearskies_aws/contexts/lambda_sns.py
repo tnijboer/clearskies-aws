@@ -20,7 +20,7 @@ class LambdaSns(Context):
 
         for record in event['Records'][0]['Sns']:
             try:
-                self.handler(LambdaSnsEventInputOutput(record['Message'], context))
+                self.handler(LambdaSnsInputOutput(record['Message'], context))
             except Exception as e:
                 print('Failed message ' + record['MessageId'] + '. Error error: ' + str(e))
 
