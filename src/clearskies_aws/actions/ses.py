@@ -13,6 +13,8 @@ from ..di import StandardDependencies
 from .assume_role import AssumeRole
 from .action_aws import ActionAws
 class SES(ActionAws):
+    _name = "ses"
+
     def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
         """Setup action."""
         super().__init__(environment, boto3, di)

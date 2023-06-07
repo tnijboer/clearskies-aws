@@ -51,11 +51,14 @@ class ActionAws(ABC):
             client = self._getClient()
             self._execute_action(client, model)
         except ClientError as e:
-            self._logging.exception(f"Failed to retrieve client for {__name__.lower()}")
+            self._logging.exception(f"Failed to retrieve client for {__class__.lower()}")
             raise ClientError from e
 
     def _getClient(self) -> boto3.client:
         """Retrieve the boto3 client."""
+        if not self._name:
+            raise ValueError(f"Name of client not set.")
+
         if self._client:
             return self._client
 
@@ -65,7 +68,7 @@ class ActionAws(ABC):
             boto3 = self.boto3
 
         try:
-            self._client = boto3.client(__name__.lower())
+            self._client = boto3.client(self._name)
         except ClientError as e:
             raise ClientError from e
         return self._client
