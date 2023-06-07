@@ -26,7 +26,6 @@ priority = "primary"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.2.2"
-yapf = "^0.32.0"
 
 [tool.poetry.extras]
 akeyless = ["akeyless-cloud-id", "akeyless"]

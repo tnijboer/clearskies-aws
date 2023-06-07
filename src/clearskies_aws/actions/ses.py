@@ -6,8 +6,8 @@ from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.models import Models
 from collections.abc import Sequence
-from mypy_boto3_ses import SESClient
 from typing import Any, Callable, List, Optional, Union
+from types import ModuleType
 
 from ..di import StandardDependencies
 from .assume_role import AssumeRole
@@ -92,7 +92,7 @@ class SES(ActionAws):
             import jinja2
             self.message_template = jinja2.Template(message_template)
 
-    def _execute_action(self, client: SESClient, model: Models) -> None:
+    def _execute_action(self, client: ModuleType, model: Models) -> None:
         """Send a notification as configured."""
         utcnow = self.di.build('utcnow')
 

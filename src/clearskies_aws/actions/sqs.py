@@ -4,10 +4,10 @@ import datetime
 
 from botocore.exceptions import ClientError
 from clearskies.environment import Environment
-from clearskies.models import Models
+from clearskies.model import Model
 from collections.abc import Sequence
 from collections import OrderedDict
-from mypy_boto3_sqs import SQSClient
+from types import ModuleType
 from typing import List, Optional, Callable
 
 from ..di import StandardDependencies
@@ -46,7 +46,7 @@ class SQS(ActionAws):
                 "You must provide at least one of 'queue_url', 'queue_url_environment_key', or 'queue_url_callable'."
             )
 
-    def _execute_action(self, client, model) -> None:
+    def _execute_action(self, client: ModuleType, model: Model) -> None:
         """Send a notification as configured."""
         try:
             client.send_message(
@@ -56,7 +56,7 @@ class SQS(ActionAws):
         except ClientError as e:
             raise e
 
-    def get_queue_url(self, model):
+    def get_queue_url(self, model: Model):
         if self.queue_url:
             return self.queue_url
         if self.queue_url_environment_key:
