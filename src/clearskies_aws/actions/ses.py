@@ -1,8 +1,17 @@
-from typing import List
-import datetime
+import boto3
 import clearskies
+import datetime
+
 from botocore.exceptions import ClientError
+from clearskies.environment import Environment
+from clearskies.models import Models
 from collections.abc import Sequence
+from mypy_boto3_ses import SESClient
+from typing import Any, Callable, List, Optional, Union
+
+from ..di import StandardDependencies
+from .assume_role import AssumeRole
+from .action_aws import ActionAws
 class SES(ActionAws):
     def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
         """Setup action."""
@@ -11,20 +20,21 @@ class SES(ActionAws):
     def configure(
         self,
         sender,
-        to=None,
-        cc=None,
-        bcc=None,
-        subject=None,
-        message=None,
-        subject_template=None,
-        message_template=None,
-        subject_template_file=None,
-        message_template_file=None,
-        assume_role=None,
-        dependencies_for_template=None,
-        when=None,
+        to: Optional[Union[list, str]] = None,
+        cc: Optional[Union[list, str]] = None,
+        bcc: Optional[Union[list, str]] = None,
+        subject: Optional[str] = None,
+        message: Optional[str] = None,
+        subject_template: Optional[str] = None,
+        message_template: Optional[str] = None,
+        subject_template_file: Optional[str] = None,
+        message_template_file: Optional[str] = None,
+        assume_role: Optional[AssumeRole] = None,
+        dependencies_for_template: Optional[list[Any]] = None,
+        when: Optional[Callable] = None,
     ) -> None:
         """Configure the rules for this email notification."""
+        super().configure(message_callable=None, when=when, assume_role=assume_role)
         self.destinations = {
             "to": [],
             "cc": [],
@@ -46,9 +56,6 @@ class SES(ActionAws):
         self.subject_template = None
         self.message_template = None
         self.dependencies_for_template = dependencies_for_template if dependencies_for_template else []
-        if when is not None and not callable(when):
-            raise ValueError("'when' must be a callable but it was something else")
-        self.when = when
 
         if not to and not cc:
             raise ValueError("You must configure at least one 'to' address or one 'cc' address")
@@ -85,23 +92,13 @@ class SES(ActionAws):
             import jinja2
             self.message_template = jinja2.Template(message_template)
 
-        self.assume_role = assume_role
-
-    def __call__(self, model) -> None:
+    def _execute_action(self, client: SESClient, model: Models) -> None:
         """Send a notification as configured."""
         utcnow = self.di.build('utcnow')
-        if self.when and not self.di.call_function(self.when, model=model):
-            return
 
-        if self.assume_role:
-            boto3 = self.assume_role(self.boto3)
-        else:
-            boto3 = self.boto3
-
-        ses = boto3.client("ses")
         tos = self._resolve_destination("to", model)
         try:
-            response = ses.send_email(
+            response = client.send_email(
                 Destination={
                     "ToAddresses": tos,
                     "CcAddresses": self._resolve_destination("cc", model),
@@ -178,7 +175,7 @@ class SES(ActionAws):
 
         return ""
 
-    def more_template_variables(self):
+    def more_template_variables(self) -> dict[str, Any]:
         more_variables = {}
         for dependency_name in self.dependencies_for_template:
             more_variables[dependency_name] = self.di.build(dependency_name)

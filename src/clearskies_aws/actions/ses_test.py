@@ -13,7 +13,7 @@ class SESTest(unittest.TestCase):
         self.boto3.client = MagicMock(return_value=self.ses)
 
     def test_send(self):
-        ses = SES(self.boto3, self.di)
+        ses = SES("environment", self.boto3, self.di)
         ses.configure(
             'test@example.com', to='jane@example.com', subject='welcome!', message_template='hi {{ model.id }}!'
         )
