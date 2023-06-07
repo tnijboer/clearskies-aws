@@ -1,10 +1,10 @@
-from ..input_outputs import LambdaSnsEvent as LambdaSnsEventInputOutput
+from ..input_outputs import LambdaSns as LambdaSnsInputOutput
 from ..di import StandardDependencies
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
 from clearskies.authentication import public
 
-class LambdaSnsEvent(Context):
+class LambdaSns(Context):
     def __init__(self, di):
         super().__init__(di)
 
@@ -22,10 +22,7 @@ class LambdaSnsEvent(Context):
             try:
                 self.handler(LambdaSnsEventInputOutput(record['Message'], context))
             except Exception as e:
-                print('Failed message ' + record['MessageId'] + ' being returned for retry.  Error error: ' + str(e))
-                item_failures.append({'itemIdentifier': record['MessageId']})
-
-        return {}
+                print('Failed message ' + record['MessageId'] + '. Error error: ' + str(e))
 
 def lambda_sns_event(
     application,

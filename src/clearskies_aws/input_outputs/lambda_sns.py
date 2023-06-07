@@ -1,7 +1,7 @@
 from .lambda_api_gateway import LambdaAPIGateway
 from clearskies.handlers.exceptions import ClientError
 import json
-class LambdaSnsEvent(LambdaAPIGateway):
+class LambdaSns(LambdaAPIGateway):
     def __init__(self, record, context):
         self._record = record
         self._context = context
