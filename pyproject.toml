@@ -12,7 +12,7 @@ repository = "https://github.com/cmancone/clearskies-aws"
 license = "MIT"
 readme = "./README.md"
 packages = [
-    { include = "src" }
+    { include = "clearskies_aws", from = "src" }
 ]
 
 [tool.poetry.dependencies]
