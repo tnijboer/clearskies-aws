@@ -14,6 +14,8 @@ from ..di import StandardDependencies
 from . import assume_role
 from .action_aws import ActionAws
 class SQS(ActionAws):
+    _name = "sqs"
+
     def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
         """Setup action."""
         super().__init__(environment, boto3, di)
