@@ -16,6 +16,7 @@ class ActionAws(ABC):
 
     _logging = logging.getLogger(__name__)
     _client: Optional[boto3.client] = None
+    _name: Optional[str] = None
 
     def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
         """Setup action."""
@@ -42,6 +43,9 @@ class ActionAws(ABC):
         if when and not callable(when):
             raise ValueError("'when' must be a callable but something else was found")
 
+        if not self._name:
+            raise ValueError(f"Name of client not set.")
+
     def __call__(self, model: Models) -> None:
         """Send a notification as configured."""
         if self.when and not self.di.call_function(self.when, model=model):
@@ -51,14 +55,11 @@ class ActionAws(ABC):
             client = self._getClient()
             self._execute_action(client, model)
         except ClientError as e:
-            self._logging.exception(f"Failed to retrieve client for {__class__.lower()}")
+            self._logging.exception(f"Failed to retrieve client for {self._name}")
             raise e
 
     def _getClient(self) -> boto3.client:
         """Retrieve the boto3 client."""
-        if not self._name:
-            raise ValueError(f"Name of client not set.")
-
         if self._client:
             return self._client
 
