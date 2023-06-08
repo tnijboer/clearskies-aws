@@ -18,11 +18,11 @@ class LambdaSns(Context):
         if self.handler is None:
             raise ValueError("Cannot execute LambdaSnsEvent context without first configuring it")
 
-        for record in event['Records'][0]['Sns']:
-            try:
-                self.handler(LambdaSnsInputOutput(record['Message'], context))
-            except Exception as e:
-                print('Failed message ' + record['MessageId'] + '. Error error: ' + str(e))
+        try:
+            self.handler(LambdaSnsInputOutput(event['Records'][0]['Sns']['Message'], context))
+        except Exception as e:
+            print('Failed message ' + record['MessageId'] + '. Error error: ' + str(e))
+            raise e
 
 def lambda_sns_event(
     application,

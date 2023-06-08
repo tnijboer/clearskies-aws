@@ -3,18 +3,17 @@ from clearskies.handlers.exceptions import ClientError
 import json
 class LambdaSns(LambdaAPIGateway):
     def __init__(self, record, context):
-        self._record = record
+        try:
+            self._record = json.loads(record)
+        except json.JSONDecodeError as e:
+            raise ClientError("The message from AWS was not a serialized JSON string.  The lambda_sns context for clearskies only accepts serialized JSON")
         self._context = context
 
     def respond(self, body, status_code=200):
         pass
 
     def get_body(self):
-        json_body = self.json_body()
-        if 'Message' in json_body:
-            return json.loads(json_body['Message'])
-
-        raise ValueError(f"Cannot retrieve body out of SNS event.")
+        return self._record
 
     def request_data(self, required=True):
         return self.json_body(required=required)
@@ -22,7 +21,7 @@ class LambdaSns(LambdaAPIGateway):
     def json_body(self, required=True):
         if not self._record:
             if required:
-                raise ClientError("SNS message was not valid JSON")
+                raise ClientError("No SNS message found")
             return {}
 
         try:
