@@ -67,10 +67,7 @@ class ActionAws(ABC):
         else:
             boto3 = self.boto3
 
-        try:
-            self._client = boto3.client(self._name)
-        except ClientError as e:
-            raise ClientError from e
+        self._client = boto3.client(self._name)
         return self._client
 
     def _execute_action(self, client: boto3.client, model: Models) -> None:
