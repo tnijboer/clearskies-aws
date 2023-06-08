@@ -52,7 +52,7 @@ class ActionAws(ABC):
             self._execute_action(client, model)
         except ClientError as e:
             self._logging.exception(f"Failed to retrieve client for {__class__.lower()}")
-            raise ClientError from e
+            raise e
 
     def _getClient(self) -> boto3.client:
         """Retrieve the boto3 client."""

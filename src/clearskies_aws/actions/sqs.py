@@ -50,13 +50,10 @@ class SQS(ActionAws):
 
     def _execute_action(self, client: ModuleType, model: Model) -> None:
         """Send a notification as configured."""
-        try:
-            client.send_message(
-                QueueUrl=self.get_queue_url(model),
-                MessageBody=self.get_message_body(model),
-            )
-        except ClientError as e:
-            raise e
+        client.send_message(
+            QueueUrl=self.get_queue_url(model),
+            MessageBody=self.get_message_body(model),
+        )
 
     def get_queue_url(self, model: Model):
         if self.queue_url:

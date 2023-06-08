@@ -48,13 +48,10 @@ class SNS(ActionAws):
 
     def _execute_action(self, client: ModuleType, model: Models) -> None:
         """Send a notification as configured."""
-        try:
-            client.publish(
-                TopicArn=self.get_topic_arn(model),
-                Message=self.get_message_body(model),
-            )
-        except ClientError as e:
-            raise ClientError from e
+        client.publish(
+            TopicArn=self.get_topic_arn(model),
+            Message=self.get_message_body(model),
+        )
 
     def get_topic_arn(self, model: Models) -> str:
         if self.topic:

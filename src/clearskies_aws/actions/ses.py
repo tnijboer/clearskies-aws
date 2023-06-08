@@ -99,33 +99,30 @@ class SES(ActionAws):
         utcnow = self.di.build('utcnow')
 
         tos = self._resolve_destination("to", model)
-        try:
-            response = client.send_email(
-                Destination={
-                    "ToAddresses": tos,
-                    "CcAddresses": self._resolve_destination("cc", model),
-                    "BccAddresses": self._resolve_destination("bcc", model),
-                },
-                Message={
-                    "Body": {
-                        "Html": {
-                            "Charset": "utf-8",
-                            "Data": self._resolve_message_as_html(model, utcnow),
-                        },
-                        "Text": {
-                            "Charset": "utf-8",
-                            "Data": self._resolve_message_as_text(model, utcnow),
-                        },
-                    },
-                    "Subject": {
+        response = client.send_email(
+            Destination={
+                "ToAddresses": tos,
+                "CcAddresses": self._resolve_destination("cc", model),
+                "BccAddresses": self._resolve_destination("bcc", model),
+            },
+            Message={
+                "Body": {
+                    "Html": {
                         "Charset": "utf-8",
-                        "Data": self._resolve_subject(model, utcnow)
+                        "Data": self._resolve_message_as_html(model, utcnow),
+                    },
+                    "Text": {
+                        "Charset": "utf-8",
+                        "Data": self._resolve_message_as_text(model, utcnow),
                     },
                 },
-                Source=self.sender,
-            )
-        except ClientError as e:
-            raise e
+                "Subject": {
+                    "Charset": "utf-8",
+                    "Data": self._resolve_subject(model, utcnow)
+                },
+            },
+            Source=self.sender,
+        )
 
     def _resolve_destination(self, name: str, model: clearskies.Model) -> List[str]:
         """
