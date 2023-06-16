@@ -21,10 +21,10 @@ class LambdaSns(Context):
         try:
             self.handler(LambdaSnsInputOutput(event['Records'][0]['Sns']['Message'], context))
         except Exception as e:
-            print('Failed message ' + record['MessageId'] + '. Error error: ' + str(e))
+            print('Failed message ' + event['Records'][0]['Sns']['MessageId'] + '. Error error: ' + str(e))
             raise e
 
-def lambda_sns_event(
+def lambda_sns(
     application,
     di_class=StandardDependencies,
     bindings=None,
@@ -33,7 +33,7 @@ def lambda_sns_event(
     additional_configs=None,
 ):
     return build_context(
-        LambdaSnsEvent,
+        LambdaSns,
         application,
         di_class=di_class,
         bindings=bindings,

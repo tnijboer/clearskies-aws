@@ -24,10 +24,7 @@ class LambdaSns(LambdaAPIGateway):
                 raise ClientError("No SNS message found")
             return {}
 
-        try:
-            return json.loads(self._record)
-        except json.JSONDecodeError:
-            raise ClientError("SNS message was not valid JSON")
+        return self._record
 
     def get_request_method(self):
         raise NotImplementedError("Request methods don't exist in an SNS context")
