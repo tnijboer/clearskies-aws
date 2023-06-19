@@ -2,9 +2,10 @@ from .lambda_api_gateway import LambdaAPIGateway
 from clearskies.handlers.exceptions import ClientError
 import json
 class LambdaSqsStandard(LambdaAPIGateway):
-    def __init__(self, record, context):
+    def __init__(self, record, event, context):
         self._record = record
         self._context = context
+        self._event = event
 
     def respond(self, body, status_code=200):
         pass

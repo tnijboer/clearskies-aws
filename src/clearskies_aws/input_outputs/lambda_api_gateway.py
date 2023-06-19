@@ -87,3 +87,9 @@ class LambdaAPIGateway(InputOutput):
 
     def get_query_parameters(self):
         return self._query_parameters
+
+    def context_specifics(self):
+        return {
+            "event": self._event,
+            "context": self._context,
+        }

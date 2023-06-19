@@ -2,12 +2,14 @@ from .lambda_api_gateway import LambdaAPIGateway
 from clearskies.handlers.exceptions import ClientError
 import json
 class LambdaSns(LambdaAPIGateway):
-    def __init__(self, record, context):
+    def __init__(self, event, context):
+        self._event = event
+        self._context = context
+        record = event['Records'][0]['Sns']['Message']
         try:
             self._record = json.loads(record)
         except json.JSONDecodeError as e:
             raise ClientError("The message from AWS was not a serialized JSON string.  The lambda_sns context for clearskies only accepts serialized JSON")
-        self._context = context
 
     def respond(self, body, status_code=200):
         pass

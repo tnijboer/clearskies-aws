@@ -20,7 +20,7 @@ class LambdaSqsStandardPartialBatch(Context):
         item_failures = []
         for record in event['Records']:
             try:
-                self.handler(LambdaSqsStandardInputOutput(record['body'], context))
+                self.handler(LambdaSqsStandardInputOutput(record['body'], event, context))
             except Exception as e:
                 print('Failed message ' + record['messageId'] + ' being returned for retry.  Error error: ' + str(e))
                 item_failures.append({'itemIdentifier': record['messageId']})
