@@ -2,8 +2,8 @@ from ...actions.ses import SES as BaseSES
 class SES(BaseSES):
     calls = None
 
-    def __init__(self, boto3, di):
-        super().__init__(boto3, di)
+    def __init__(self, environment, boto3, di):
+        super().__init__(environment, boto3, di)
 
     @classmethod
     def mock(cls, di):
