@@ -139,7 +139,7 @@ class SES(ActionAws):
             if "@" in destination:
                 resolved.append(destination)
                 continue
-            resolved.append(model.get(name))
+            resolved.append(model.get(destination))
         return resolved
 
     def _resolve_message_as_html(self, model: clearskies.Model, now: datetime.datetime) -> str:
