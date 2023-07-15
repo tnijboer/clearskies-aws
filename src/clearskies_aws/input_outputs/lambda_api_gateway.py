@@ -93,3 +93,6 @@ class LambdaAPIGateway(InputOutput):
             "event": self._event,
             "context": self._context,
         }
+
+    def get_client_ip(self):
+        return self._event.get('requestContext', {}).get('identity', {}).get('sourceIp')
