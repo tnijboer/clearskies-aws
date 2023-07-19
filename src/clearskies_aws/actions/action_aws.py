@@ -92,5 +92,5 @@ class ActionAws(ABC):
         for (column_name, column) in model.columns().items():
             if not column.is_readable:
                 continue
-            model_data[column_name] = column.to_json(model)
+            model_data.update(column.to_json(model))
         return json.dumps(model_data)

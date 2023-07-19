@@ -177,5 +177,5 @@ class SES(ActionAws):
     def more_template_variables(self) -> dict[str, Any]:
         more_variables = {}
         for dependency_name in self.dependencies_for_template:
-            more_variables[dependency_name] = self.di.build(dependency_name)
+            more_variables[dependency_name] = self.di.build(dependency_name, cache=True)
         return more_variables
