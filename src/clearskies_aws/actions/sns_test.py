@@ -26,6 +26,8 @@ class SNSTest(unittest.TestCase):
         self.boto3 = MagicMock()
         self.boto3.client = MagicMock(return_value=self.sns)
         self.when = None
+        self.environment = MagicMock()
+        self.environment.get = MagicMock(return_value='us-east-1')
 
     def always(self, model):
         self.when = model
@@ -36,7 +38,7 @@ class SNSTest(unittest.TestCase):
         return False
 
     def test_send(self):
-        sns = SNS("environment", self.boto3, self.di)
+        sns = SNS(self.environment, self.boto3, self.di)
         sns.configure(
             topic='arn:aws:my-topic',
             when=self.always,
@@ -60,7 +62,7 @@ class SNSTest(unittest.TestCase):
         self.assertEqual(id(user), id(self.when))
 
     def test_not_now(self):
-        sns = SNS("environment", self.boto3, self.di)
+        sns = SNS(self.environment, self.boto3, self.di)
         sns.configure(
             topic='arn:aws:my-topic',
             when=self.never,

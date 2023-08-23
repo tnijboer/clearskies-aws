@@ -14,7 +14,7 @@ class User(clearskies.Model):
             clearskies.column_types.string('name'),
             clearskies.column_types.email('email'),
         ])
-class SESTest(unittest.TestCase):
+class SQSTest(unittest.TestCase):
     def setUp(self):
         self.di = StandardDependencies()
         self.di.bind('environment', {'AWS_REGION': 'us-east-2'})
@@ -24,6 +24,8 @@ class SESTest(unittest.TestCase):
         self.boto3 = MagicMock()
         self.boto3.client = MagicMock(return_value=self.sqs)
         self.when = None
+        self.environment = MagicMock()
+        self.environment.get = MagicMock(return_value='us-east-1')
 
     def always(self, model):
         self.when = model
@@ -34,7 +36,7 @@ class SESTest(unittest.TestCase):
         return False
 
     def test_send(self):
-        sqs = SQS("environment", self.boto3, self.di)
+        sqs = SQS(self.environment, self.boto3, self.di)
         sqs.configure(
             queue_url='https://queue.example.com',
             when=self.always,
@@ -58,7 +60,7 @@ class SESTest(unittest.TestCase):
         self.assertEqual(id(user), id(self.when))
 
     def test_not_now(self):
-        sqs = SQS("environment", self.boto3, self.di)
+        sqs = SQS(self.environment, self.boto3, self.di)
         sqs.configure(
             queue_url='https://queue.example.com',
             when=self.never,

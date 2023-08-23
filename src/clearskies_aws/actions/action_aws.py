@@ -46,8 +46,8 @@ class ActionAws(ABC):
         if not self._name:
             raise ValueError(f"Name of client not set.")
 
-        if not self.environment.get('AWS_REGION', True):
-            raise ValueError("You must set the AWS_REGION environment variable when using AWS actions")
+        if not self.environment.get('AWS_REGION', True) and not self.environment.get('AWS_DEFAULT_REGION', True):
+            raise ValueError("You must set either the AWS_REGION or AWS_DEFAULT_REGION environment variable when using AWS actions")
 
     def __call__(self, model: Models) -> None:
         """Send a notification as configured."""
@@ -71,7 +71,11 @@ class ActionAws(ABC):
         else:
             boto3 = self.boto3
 
-        self._client = boto3.client(self._name, region_name=self.environment.get('AWS_REGION'))
+        region = self.environment.get('AWS_REGION', silent=True)
+        if region:
+            self._client = boto3.client(self._name, region_name=region)
+        else:
+            self._client = boto3.client(self._name)
         return self._client
 
     def _execute_action(self, client: boto3.client, model: Models) -> None:
