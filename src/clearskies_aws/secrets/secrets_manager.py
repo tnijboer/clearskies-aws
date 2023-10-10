@@ -68,3 +68,8 @@ class SecretsManager:
         }
         calling_parameters = {key: value for (key, value) in calling_parameters.items() if value}
         result = self._secrets_manager.put_secret_value(**calling_parameters)
+
+    def list_sub_folders(self, path, value):
+        raise NotImplementedError(
+            "Secrets Manager doesn't support list_sub_folders."
+        )

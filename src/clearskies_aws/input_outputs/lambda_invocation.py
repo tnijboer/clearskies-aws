@@ -2,11 +2,17 @@ from .lambda_api_gateway import LambdaAPIGateway
 import json
 from clearskies.handlers.exceptions import ClientError
 class LambdaInvocation(LambdaAPIGateway):
-    def __init__(self, event, context):
+    def __init__(
+        self,
+        event,
+        context,
+        method=None,
+        url=None,
+    ):
         self._event = event
         self._context = context
-        self._path = ''
-        self._request_method = 'GET'
+        self._path = url if url else ''
+        self._request_method = method.upper() if method else 'GET'
         self._query_parameters = {}
         self._path_parameters = []
         self._request_headers = {}

@@ -13,11 +13,22 @@ class LambdaInvocation(Context):
             **config,
         }
 
-    def __call__(self, event, context):
+    def __call__(
+        self,
+        event,
+        context,
+        method=None,
+        url=None,
+    ):
         if self.handler is None:
             raise ValueError("Cannot execute LambdaInvocation context without first configuring it")
 
-        return self.handler(LambdaInvocationInputOutput(event, context))
+        return self.handler(LambdaInvocationInputOutput(
+            event,
+            context,
+            method=None,
+            url=None,
+        ))
 def lambda_invocation(
     application,
     di_class=StandardDependencies,

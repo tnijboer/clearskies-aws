@@ -43,3 +43,8 @@ class ParameterStore:
 
     def upsert(self, path, value):
         return self.update(path, value)
+
+    def list_sub_folders(self, path, value):
+        raise NotImplementedError(
+            "Parameter store doesn't support list_sub_folders."
+        )
