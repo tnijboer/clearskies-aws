@@ -26,8 +26,8 @@ class LambdaInvocation(Context):
         return self.handler(LambdaInvocationInputOutput(
             event,
             context,
-            method=None,
-            url=None,
+            method=method,
+            url=url,
         ))
 def lambda_invocation(
     application,
