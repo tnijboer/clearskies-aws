@@ -17,6 +17,9 @@ class LambdaInvocation(LambdaAPIGateway):
         self._path_parameters = []
         self._request_headers = {}
 
+    def get_body(self):
+        return self._event
+
     def json_body(self, required=True):
         if required and not self._event:
             raise ClientError("Request body was not valid JSON")
