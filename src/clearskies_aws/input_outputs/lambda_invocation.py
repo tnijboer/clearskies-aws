@@ -17,6 +17,9 @@ class LambdaInvocation(LambdaAPIGateway):
         self._path_parameters = []
         self._request_headers = {}
 
+    def has_body(self):
+        return True
+
     def get_body(self):
         return self._event
 
