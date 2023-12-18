@@ -1,5 +1,6 @@
 from .cli import cli
 from .lambda_api_gateway import lambda_api_gateway
+from .lambda_api_gateway_web_socket import lambda_api_gateway_web_socket
 from .lambda_elb import lambda_elb
 from .lambda_http_gateway import lambda_http_gateway
 from .lambda_invocation import lambda_invocation
