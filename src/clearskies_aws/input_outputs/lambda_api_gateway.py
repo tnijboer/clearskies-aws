@@ -17,13 +17,13 @@ class LambdaAPIGateway(InputOutput):
     def __init__(self, event, context):
         self._event = event
         self._context = context
-        self._request_method = event['httpMethod'].upper()
-        self._path = event['path']
-        self._resource = event['resource']
-        self._query_parameters = event['queryStringParameters'] if event['queryStringParameters'] is not None else {}
-        self._path_parameters = event['pathParameters']
+        self._request_method = event.get('httpMethod', '').upper()
+        self._path = event.get('path')
+        self._resource = event.get('resource')
+        self._query_parameters = event.get('queryStringParameters', {})
+        self._path_parameters = event.get('pathParameters', {})
         self._request_headers = {}
-        for (key, value) in event['headers'].items():
+        for (key, value) in event.get('headers', {}).items():
             self._request_headers[key.lower()] = value
 
     def respond(self, body, status_code=200):
