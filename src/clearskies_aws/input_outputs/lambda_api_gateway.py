@@ -49,8 +49,8 @@ class LambdaAPIGateway(InputOutput):
 
     def get_body(self):
         if not self._body_was_cached:
-            self._cached_body = self._event['body']
-            if self._cached_body is not None and self._event['isBase64Encoded']:
+            self._cached_body = self._event.get('body')
+            if self._cached_body is not None and self._event.get('isBase64Encoded'):
                 self._cached_body = base64.decodebytes(self._cached_body.encode('utf-8')).decode('utf-8')
         return self._cached_body
 
