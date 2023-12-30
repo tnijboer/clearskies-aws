@@ -5,6 +5,9 @@ import clearskies
 
 
 class WebSocketConnectionModel(clearskies.Model):
+
+    id_column_name = "connection_id"
+
     def __init__(self, backend, columns, boto3, input_output):
         super().__init__(backend, columns)
         self._boto3 = boto3
