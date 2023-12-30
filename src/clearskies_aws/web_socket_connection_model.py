@@ -28,7 +28,12 @@ class WebSocketConnectionModel(clearskies.Model):
         event = self._input_output.context_specifics()["event"]
         domain = event.get("requestContext", {}).get("domainName")
         stage = event.get("requestContext", {}).get("stage")
-        api_gateway = self._boto3.client("apigatewaymanagementapi", endpoint_url=f"https://{domain}/{stage}")
+        # only include the stage if we're using the default AWS domain - not with a custom domain
+        if ".amazonaws.com" in domain:
+            endpoint_url = f"https://{domain}/{stage}"
+        else:
+            endpoint_url = f"https://{domain}"
+        api_gateway = self._boto3.client("apigatewaymanagementapi", endpoint_url=endpoint_url)
 
         bytes_message = json.dumps(message).encode("utf-8")
         try:
