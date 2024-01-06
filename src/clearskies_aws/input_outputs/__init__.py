@@ -1,3 +1,4 @@
+from .cli_websocket_mock import CLIWebsocketMock
 from .lambda_api_gateway import LambdaAPIGateway
 from .lambda_api_gateway_web_socket import LambdaAPIGatewayWebSocket
 from .lambda_elb import LambdaELB

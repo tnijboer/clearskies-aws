@@ -33,7 +33,7 @@ class SimpleBodyRouting(clearskies.handlers.Routing):
             self.configuration("routes")[route],
             request_data=body,
             **input_output.context_specifics(),
-        ))
+        ), 200)
 
     def documentation(self):
         return []
