@@ -1,11 +1,12 @@
 import clearskies
 
-from typing import Optional
+from typing import Optional, Callable
 
 from .assume_role import AssumeRole
 from .ses import SES
 from .sns import SNS
 from .sqs import SQS
+from .step_function import StepFunction
 def ses(
     sender,
     to=None,
@@ -55,7 +56,7 @@ def sns(
 def sqs(
     queue_url: str = '',
     queue_url_environment_key: str = '',
-    queue_url_callable: str = '',
+    queue_url_callable: Callable = '',
     message_callable=None,
     when=None,
     assume_role=None,
@@ -65,6 +66,23 @@ def sqs(
         queue_url=queue_url,
         queue_url_environment_key=queue_url_environment_key,
         queue_url_callable=queue_url_callable,
+        message_callable=message_callable,
+        when=when,
+        assume_role=assume_role,
+    )
+def step_function(
+    arn: str = "",
+    arn_environment_key: str = "",
+    arn_callable: Optional[Callable] = None,
+    message_callable: Optional[Callable] = None,
+    when: Optional[Callable] = None,
+    assume_role: Optional[AssumeRole] = None,
+):
+    return clearskies.BindingConfig(
+        StepFunction,
+        arn=arn,
+        arn_environment_key=arn_environment_key,
+        arn_callable=arn_callable,
         message_callable=message_callable,
         when=when,
         assume_role=assume_role,
@@ -83,4 +101,4 @@ def assume_role(
         duration=duration,
         source=source,
     )
-__all__ = [assume_role, AssumeRole, ses, SES, sns, SNS, sqs, SQS]
+__all__ = [assume_role, AssumeRole, ses, SES, sns, SNS, step_function, StepFunction, sqs, SQS]
