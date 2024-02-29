@@ -11,16 +11,21 @@ class User(clearskies.Model):
 
     def columns_configuration(self):
         return OrderedDict([
-            clearskies.column_types.string('name'),
             clearskies.column_types.email('email'),
+            clearskies.column_types.string('execution_arn'),
         ])
 class StepFunctionTest(unittest.TestCase):
     def setUp(self):
         self.di = StandardDependencies()
         self.di.bind('environment', {'AWS_REGION': 'us-east-2'})
+        memory_backend = self.di.build("memory_backend")
         self.users = self.di.build(User)
+        self.user = self.users.create({
+            "id": "1-2-3-4",
+            "email": "blah@example.com",
+        })
         self.step_function = MagicMock()
-        self.step_function.start_execution = MagicMock()
+        self.step_function.start_execution = MagicMock(return_value={"executionArn":"aws:arn:execution"})
         self.boto3 = MagicMock()
         self.boto3.client = MagicMock(return_value=self.step_function)
         self.when = None
@@ -40,24 +45,21 @@ class StepFunctionTest(unittest.TestCase):
         step_function.configure(
             arn='aws::arn::step/asdf-er',
             when=self.always,
+            column_to_store_execution_arn="execution_arn",
         )
-        user = self.users.model({
-            "id": "1-2-3-4",
-            "name": "Jane",
-            "email": "jane@example.com",
-        })
-        step_function(user)
+        step_function(self.user)
         self.step_function.start_execution.assert_has_calls([
             call(
                 StateMachineArn='aws::arn::step/asdf-er',
                 Message=json.dumps({
-                    "id": "1-2-3-4",
-                    "name": "Jane",
-                    "email": "jane@example.com",
+                    "id": self.user.id,
+                    "email": self.user.email,
+                    "execution_arn": None,
                 }),
             ),
         ])
-        self.assertEqual(id(user), id(self.when))
+        self.assertEqual(id(self.user), id(self.when))
+        self.assertEqual("aws:arn:execution", self.user.execution_arn)
 
     def test_not_now(self):
         step_function = StepFunction(self.environment, self.boto3, self.di)

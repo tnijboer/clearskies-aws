@@ -77,6 +77,7 @@ def step_function(
     message_callable: Optional[Callable] = None,
     when: Optional[Callable] = None,
     assume_role: Optional[AssumeRole] = None,
+    column_to_store_execution_arn: Optional[str] = None,
 ):
     return clearskies.BindingConfig(
         StepFunction,
@@ -86,6 +87,7 @@ def step_function(
         message_callable=message_callable,
         when=when,
         assume_role=assume_role,
+        column_to_store_execution_arn=column_to_store_execution_arn,
     )
 def assume_role(
     role_arn: str,

@@ -17,8 +17,9 @@ class StepFunction(ActionAws):
     def configure(
         self,
         arn: Optional[str]=None,
-        arn_environment_key: Optional[str]=None,
+        arn_environment_key: Optional[str] = None,
         arn_callable: Optional[Callable] = None,
+        column_to_store_execution_arn: Optional[str] = None,
         message_callable: Optional[Callable] = None,
         when: Optional[Callable] = None,
         assume_role: Optional[AssumeRole] = None,
@@ -29,6 +30,7 @@ class StepFunction(ActionAws):
         self.arn = arn
         self.arn_environment_key = arn_environment_key
         self.arn_callable = arn_callable
+        self.column_to_store_execution_arn = column_to_store_execution_arn
 
         arns = 0
         for value in [arn, arn_environment_key, arn_callable]:
@@ -43,10 +45,13 @@ class StepFunction(ActionAws):
 
     def _execute_action(self, client: ModuleType, model: Models) -> None:
         """Send a notification as configured."""
-        client.start_execution(
+        response = client.start_execution(
             StateMachineArn=self.get_arn(model),
             Message=self.get_message_body(model),
         )
+
+        if self.column_to_store_execution_arn:
+            model.save({self.column_to_store_execution_arn: response['executionArn']})
 
     def get_arn(self, model: Models) -> str:
         if self.arn:
