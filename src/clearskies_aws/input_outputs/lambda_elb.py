@@ -16,3 +16,6 @@ class LambdaELB(LambdaAPIGateway):
         self._request_headers = {}
         for (key, value) in event.get('headers', {}).items():
             self._request_headers[key.lower()] = value
+
+    def get_client_ip(self):
+        return self.get_request_header('x-forwarded-for')

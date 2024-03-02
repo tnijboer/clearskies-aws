@@ -95,4 +95,9 @@ class LambdaAPIGateway(InputOutput):
         }
 
     def get_client_ip(self):
-        return self._event.get('requestContext', {}).get('identity', {}).get('sourceIp')
+        # I haven't actually tested with an API gateway yet to figure out which of these works...
+        sourceIp = self._event.get('requestContext', {}).get('identity', {}).get('sourceIp')
+        if sourceIp:
+            return sourceIp
+
+        return self.get_request_header('x-forwarded-for', silent=True)

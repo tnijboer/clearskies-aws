@@ -35,7 +35,7 @@ class SecretsManager:
                 if silent_if_not_found:
                     return None
                 raise NotFound(
-                    f"Cound not find secret '{secret_id}' with version '{version}' and stage '{version_stage}'"
+                    f"Cound not find secret '{secret_id}' with version '{version_id}' and stage '{version_stage}'"
                 )
             raise e
         if result.get('SecretString'):
