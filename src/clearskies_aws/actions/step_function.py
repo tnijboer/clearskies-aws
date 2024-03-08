@@ -46,8 +46,8 @@ class StepFunction(ActionAws):
     def _execute_action(self, client: ModuleType, model: Models) -> None:
         """Send a notification as configured."""
         response = client.start_execution(
-            StateMachineArn=self.get_arn(model),
-            Message=self.get_message_body(model),
+            stateMachineArn=self.get_arn(model),
+            input=self.get_message_body(model),
         )
 
         if self.column_to_store_execution_arn:

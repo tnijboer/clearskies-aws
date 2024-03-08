@@ -50,8 +50,8 @@ class StepFunctionTest(unittest.TestCase):
         step_function(self.user)
         self.step_function.start_execution.assert_has_calls([
             call(
-                StateMachineArn='aws::arn::step/asdf-er',
-                Message=json.dumps({
+                stateMachineArn='aws::arn::step/asdf-er',
+                input=json.dumps({
                     "id": self.user.id,
                     "email": self.user.email,
                     "execution_arn": None,
