@@ -7,6 +7,7 @@ from boto3 import client
 from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.models import Models
+from clearskies.functional import string
 from collections import OrderedDict
 from typing import Callable, Optional
 
@@ -100,4 +101,4 @@ class ActionAws(ABC):
             if not column.is_readable:
                 continue
             model_data.update(column.to_json(model))
-        return json.dumps(model_data)
+        return json.dumps(model_data, default=string.datetime_to_iso)
