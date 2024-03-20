@@ -88,7 +88,7 @@ class ActionAws(ABC):
         if self.message_callable:
             result = self.di.call_function(self.message_callable, model=model)
             if isinstance(result, dict) or isinstance(result, list):
-                return json.dumps(result, default=datetime_to_iso)
+                return json.dumps(result, default=string.datetime_to_iso)
             if not isinstance(result, str):
                 raise TypeError(
                     f"The return value from the message callable for the {__name__} action must be a string, dictionary, or list. I received a "
