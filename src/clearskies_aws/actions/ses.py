@@ -22,9 +22,9 @@ class SES(ActionAws):
     def configure(
         self,
         sender,
-        to: Optional[Union[list, str]] = None,
-        cc: Optional[Union[list, str]] = None,
-        bcc: Optional[Union[list, str]] = None,
+        to: Optional[Union[list, str,  Callable]] = None,
+        cc: Optional[Union[list, str,  Callable]] = None,
+        bcc: Optional[Union[list, str,  Callable]] = None,
         subject: Optional[str] = None,
         message: Optional[str] = None,
         subject_template: Optional[str] = None,
@@ -48,7 +48,7 @@ class SES(ActionAws):
             destination_values = locals()[key]
             if not destination_values:
                 continue
-            if type(destination_values) == str:
+            if type(destination_values) == str or callable(destination_values):
                 self.destinations[key] = [destination_values]
             else:
                 self.destinations[key] = destination_values
@@ -136,6 +136,17 @@ class SES(ActionAws):
         resolved = []
         destinations = self.destinations[name]
         for destination in destinations:
+            if callable(destination):
+                more = self.di.call_function(destination, model=model)
+                if not isinstance(more, list):
+                    more = [more]
+                for entry in more:
+                    if not isinstance(entry, str):
+                        raise ValueError(f"I invoked a callable to fetch the '{name}' addresses for model '{model.__class__.__name__}' but it returned something other than a string.  Callables must return a valid email address or a list of email addresses.")
+                    if "@" not in entry:
+                        raise ValueError(f"I invoked a callable to fetch the '{name}' addresses for model '{model.__class__.__name__}' but it returned a non-email address.  Callables must return a valid email address or a list of email addresses.")
+                resolved.extend(more)
+                continue
             if "@" in destination:
                 resolved.append(destination)
                 continue
