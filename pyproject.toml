@@ -2,7 +2,7 @@
 
 [tool.poetry]
 name = "clear-skies-aws"
-version = "1.9.3"
+version = "1.9.4"
 description = "clearskies bindings for working in AWS"
 authors = [
     "Conor Mancone <cmancone@gmail.com>",
@@ -16,7 +16,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 clear-skies = "^1.14.4"
 boto3 = "^1.26.148"
 
