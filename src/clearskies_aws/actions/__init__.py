@@ -60,6 +60,7 @@ def sqs(
     message_callable=None,
     when=None,
     assume_role=None,
+    message_group_id=None,
 ):
     return clearskies.BindingConfig(
         SQS,
@@ -69,6 +70,7 @@ def sqs(
         message_callable=message_callable,
         when=when,
         assume_role=assume_role,
+        message_group_id=message_group_id,
     )
 def step_function(
     arn: str = "",

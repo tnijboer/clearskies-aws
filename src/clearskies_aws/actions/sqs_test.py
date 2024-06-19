@@ -59,6 +59,58 @@ class SQSTest(unittest.TestCase):
         ])
         self.assertEqual(id(user), id(self.when))
 
+    def test_send_message_group_id(self):
+        sqs = SQS(self.environment, self.boto3, self.di)
+        sqs.configure(
+            queue_url='https://queue.example.com',
+            when=self.always,
+            message_group_id='heysup',
+        )
+        user = self.users.model({
+            "id": "1-2-3-4",
+            "name": "Jane",
+            "email": "jane@example.com",
+        })
+        sqs(user)
+        self.sqs.send_message.assert_has_calls([
+            call(
+                QueueUrl='https://queue.example.com',
+                MessageGroupId='heysup',
+                MessageBody=json.dumps({
+                    "id": "1-2-3-4",
+                    "name": "Jane",
+                    "email": "jane@example.com",
+                }),
+            ),
+        ])
+        self.assertEqual(id(user), id(self.when))
+
+    def test_send_message_group_id_callable(self):
+        sqs = SQS(self.environment, self.boto3, self.di)
+        sqs.configure(
+            queue_url='https://queue.example.com',
+            when=self.always,
+            message_group_id=lambda model: model.id,
+        )
+        user = self.users.model({
+            "id": "1-2-3-4",
+            "name": "Jane",
+            "email": "jane@example.com",
+        })
+        sqs(user)
+        self.sqs.send_message.assert_has_calls([
+            call(
+                QueueUrl='https://queue.example.com',
+                MessageGroupId='1-2-3-4',
+                MessageBody=json.dumps({
+                    "id": "1-2-3-4",
+                    "name": "Jane",
+                    "email": "jane@example.com",
+                }),
+            ),
+        ])
+        self.assertEqual(id(user), id(self.when))
+
     def test_not_now(self):
         sqs = SQS(self.environment, self.boto3, self.di)
         sqs.configure(
