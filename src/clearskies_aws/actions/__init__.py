@@ -1,6 +1,6 @@
 import clearskies
 
-from typing import Optional, Callable
+from typing import Optional, Callable, Union
 
 from .assume_role import AssumeRole
 from .ses import SES
@@ -57,10 +57,10 @@ def sqs(
     queue_url: str = '',
     queue_url_environment_key: str = '',
     queue_url_callable: Callable = '',
-    message_callable=None,
-    when=None,
+    message_callable: Callable = None,
+    when: Callable = None,
     assume_role=None,
-    message_group_id=None,
+    message_group_id: Optional[Union[Callable, str]]=None,
 ):
     return clearskies.BindingConfig(
         SQS,
