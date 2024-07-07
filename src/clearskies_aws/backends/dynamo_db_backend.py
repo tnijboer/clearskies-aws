@@ -597,4 +597,8 @@ class DynamoDBBackend(Backend):
                 return backend_data
             as_string = "1" if bool(backend_data[column.name]) else "0"
             return {**backend_data, column.name: as_string}
+        if isinstance(column, Float):
+            if column.name not in backend_data:
+                return backend_data
+            return {**backend_data, column.name: Decimal(backend_data[column.name])}
         return column.to_backend(backend_data)
