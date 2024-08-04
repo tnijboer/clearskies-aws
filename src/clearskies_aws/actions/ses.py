@@ -99,6 +99,8 @@ class SES(ActionAws):
         utcnow = self.di.build('utcnow')
 
         tos = self._resolve_destination("to", model)
+        if not tos:
+            return
         response = client.send_email(
             Destination={
                 "ToAddresses": tos,

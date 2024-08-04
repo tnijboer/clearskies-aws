@@ -60,6 +60,8 @@ class SQS(ActionAws):
             "QueueUrl": self.get_queue_url(model),
             "MessageBody": self.get_message_body(model),
         }
+        if not params["QueueUrl"]:
+            return
 
         if self.message_group_id:
             if callable(self.message_group_id):
