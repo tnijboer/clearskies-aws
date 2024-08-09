@@ -30,15 +30,17 @@ class LambdaAPIGateway(InputOutput):
         if not self.has_header('content-type'):
             self.set_header('content-type', 'application/json; charset=UTF-8')
 
+        is_base64 = False
         if type(body) == bytes:
-            final_body = body.decode('utf-8')
+            is_base64 = True
+            final_body = base64.encodebytes(body)
         elif type(body) == str:
             final_body = body
         else:
             final_body = json.dumps(body)
 
         return {
-            "isBase64Encoded": False,
+            "isBase64Encoded": is_base64,
             "statusCode": status_code,
             "headers": self._response_headers,
             "body": final_body,

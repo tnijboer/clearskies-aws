@@ -2,7 +2,7 @@
 
 [tool.poetry]
 name = "clear-skies-aws"
-version = "1.9.9"
+version = "1.9.10"
 description = "clearskies bindings for working in AWS"
 authors = [
     "Conor Mancone <cmancone@gmail.com>",
