@@ -33,7 +33,7 @@ class LambdaAPIGateway(InputOutput):
         is_base64 = False
         if type(body) == bytes:
             is_base64 = True
-            final_body = base64.encodebytes(body)
+            final_body = base64.encodebytes(body).decode('utf8')
         elif type(body) == str:
             final_body = body
         else:
