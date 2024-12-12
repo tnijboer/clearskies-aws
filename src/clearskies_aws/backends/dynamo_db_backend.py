@@ -138,6 +138,8 @@ class DynamoDBBackend(Backend):
             )
         table = self._dynamodb.Table(model.table_name())
 
+        data = self.excessive_type_casting(data)
+
         updated = table.update_item(
             Key=key,
             UpdateExpression='SET ' + ', '.join([f"#{column_name} = :{column_name}" for column_name in data.keys()]),
@@ -157,6 +159,12 @@ class DynamoDBBackend(Backend):
         table = self._dynamodb.Table(model.table_name())
         table.put_item(Item=data)
         return {**data}
+
+    def excessive_type_casting(self, data):
+        for (key, value) in data.items():
+            if isinstance(value, float):
+                data[key] = Decimal(value)
+        return data
 
     def delete(self, id, model):
         table = self._dynamodb.Table(model.table_name())
