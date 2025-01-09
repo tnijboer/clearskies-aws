@@ -17,10 +17,10 @@ class LambdaSns(LambdaAPIGateway):
     def get_body(self):
         return self._record
 
-    def request_data(self, required=True):
-        return self.json_body(required=required)
+    def request_data(self, required=True, allow_non_json_bodies=False):
+        return self.json_body(required=required, allow_non_json_bodies=allow_non_json_bodies)
 
-    def json_body(self, required=True):
+    def json_body(self, required=True, allow_non_json_bodies=False):
         if not self._record:
             if required:
                 raise ClientError("No SNS message found")
