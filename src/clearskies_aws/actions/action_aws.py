@@ -62,9 +62,10 @@ class ActionAws(ABC):
             self._logging.exception(f"Failed to retrieve client for {self._name}")
             raise e
 
-    def _getClient(self) -> boto3.client:
+    def _getClient(self, region=None) -> boto3.client:
         """Retrieve the boto3 client."""
-        if self._client:
+        can_cache = not region
+        if self._client and can_cache:
             return self._client
 
         if self.assume_role:
@@ -72,12 +73,25 @@ class ActionAws(ABC):
         else:
             boto3 = self.boto3
 
+        if not region:
+            region = self.default_region()
+        if region:
+            client = boto3.client(self._name, region_name=region)
+        else:
+            client = boto3.client(self._name)
+
+        if can_cache:
+            self._client = client
+        return client
+
+    def default_region(self):
         region = self.environment.get('AWS_REGION', silent=True)
         if region:
-            self._client = boto3.client(self._name, region_name=region)
-        else:
-            self._client = boto3.client(self._name)
-        return self._client
+            return region
+        region = self.environment.get('DEFAULT_AWS_REGION', silent=True)
+        if region:
+            return region
+        return None
 
     def _execute_action(self, client: boto3.client, model: Models) -> None:
         """Run the action."""

@@ -45,6 +45,11 @@ class StepFunction(ActionAws):
 
     def _execute_action(self, client: ModuleType, model: Models) -> None:
         """Send a notification as configured."""
+        arn = self.get_arn(model)
+        default_region = self.default_region()
+        arn_region = arn.split(':')[3]
+        if default_region and default_region != arn_region:
+            client = self._getClient(region=arn_region)
         response = client.start_execution(
             stateMachineArn=self.get_arn(model),
             input=self.get_message_body(model),
