@@ -14,14 +14,14 @@ class LambdaSqsStandardPartialBatch(Context):
             **config,
         }
 
-    def __call__(self, event, context):
+    def __call__(self, event, context, url=None, method=None):
         if self.handler is None:
             raise ValueError("Cannot execute LambdaELB context without first configuring it")
 
         item_failures = []
         for record in event['Records']:
             try:
-                self.handler(LambdaSqsStandardInputOutput(record['body'], event, context))
+                self.handler(LambdaSqsStandardInputOutput(record['body'], event, context, url=url, method=method))
             except Exception as e:
                 print('Failed message ' + record['messageId'] + ' being returned for retry.  Error error: ' + str(e))
                 traceback.print_tb(e.__traceback__)

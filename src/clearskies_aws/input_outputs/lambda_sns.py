@@ -2,9 +2,11 @@ from .lambda_api_gateway import LambdaAPIGateway
 from clearskies.handlers.exceptions import ClientError
 import json
 class LambdaSns(LambdaAPIGateway):
-    def __init__(self, event, context):
+    def __init__(self, event, context, url=None, method=None):
         self._event = event
         self._context = context
+        self._path = url if url else ''
+        self._request_method = method.upper() if method else 'GET'
         record = event['Records'][0]['Sns']['Message']
         try:
             self._record = json.loads(record)
