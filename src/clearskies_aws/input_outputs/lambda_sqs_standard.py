@@ -32,15 +32,6 @@ class LambdaSqsStandard(LambdaAPIGateway):
         except json.JSONDecodeError:
             raise ClientError("SQS message was not valid JSON")
 
-    def get_request_method(self):
-        raise NotImplementedError("Request methods don't exist in an SQS context")
-
-    def get_script_name(self):
-        raise NotImplementedError("Script names doesn't exist in an SQS context")
-
-    def get_path_info(self):
-        raise NotImplementedError("Path info doesn't exist in an SQS context")
-
     def get_query_string(self):
         raise NotImplementedError("The query string doesn't exist in an SQS context")
 
