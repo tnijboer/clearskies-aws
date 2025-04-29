@@ -571,12 +571,11 @@ class DynamoDBBackend(Backend):
         return [AutoDocString(case_mapping('next_token'))]
 
     def documentation_pagination_next_page_example(self, case_mapping: Callable) -> Dict[str, Any]:
-        return {case_mapping('next_token'): 'eyJpZCI6IHsiUyI6ICIzODM0MyJ9fQ=='}
+        return {case_mapping('next_token'): ''}
 
     def documentation_pagination_parameters(self, case_mapping: Callable) -> List[Tuple[Any]]:
         return [(
-            AutoDocString(case_mapping('next_token'),
-                          example='eyJpZCI6IHsiUyI6ICIzODM0MyJ9fQ=='), 'A token to fetch the next page of results'
+            AutoDocString(case_mapping('next_token'), example=''), 'A token to fetch the next page of results'
         )]
 
     def column_from_backend(self, column, value):
