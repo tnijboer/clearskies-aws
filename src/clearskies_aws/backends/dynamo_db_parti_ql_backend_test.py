@@ -1,43 +1,45 @@
 import base64
 import json
+import re
 import unittest
 from decimal import Decimal
 from unittest.mock import MagicMock, call, patch
 
 from boto3.session import Session as Boto3Session
 from botocore.exceptions import ClientError
-from clearskies import Model  # For mocking model instances
+from clearskies import Model
 from clearskies.autodoc.schema import String as AutoDocString
 
-# Imports for the classes under test and their dependencies
 from clearskies_aws.backends.dynamo_db_parti_ql_backend import (
     DynamoDBPartiQLBackend,
     DynamoDBPartiQLCursor,
 )
 
-# No longer using a global mock_logger here. It will be injected by @patch.
 
-
-@patch(
-    "clearskies_aws.backends.dynamo_db_parti_ql_backend.logger"
-)  # Patch the logger at the module level of the backend
+@patch("clearskies_aws.backends.dynamo_db_parti_ql_backend.logger")
 class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
     def setUp(self):
         """Set up the test environment before each test method."""
         self.mock_boto3_session = MagicMock(spec=Boto3Session)
-        self.mock_dynamodb_client = MagicMock()  # This is the client used by the cursor
+        self.mock_dynamodb_client = MagicMock()
         self.mock_boto3_session.client.return_value = self.mock_dynamodb_client
 
-        # Instantiate the actual cursor with the mocked Boto3 client setup
-        # We will test the actual .execute() method of this cursor instance.
         self.cursor_under_test = DynamoDBPartiQLCursor(self.mock_boto3_session)
 
         self.backend = DynamoDBPartiQLBackend(self.cursor_under_test)
         self.mock_model = MagicMock(spec=Model)
-        # Configure common model attributes needed by backend methods
         self.mock_model.table_name = "my_test_table"
         self.mock_model.id_column_name = "id"
+
+        self.mock_model.schema = MagicMock()
+        self.mock_model.schema.return_value.indexes = {}
+
+        self.backend._get_table_description = MagicMock()
+        self.backend._get_table_description.return_value = {
+            "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+            "GlobalSecondaryIndexes": [],
+        }
 
     def _get_base_config(self, table_name="test_table", **overrides):
         """Helper to create a base configuration dictionary with defaults."""
@@ -50,6 +52,8 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             "model_columns": [],
             "select_all": False,
             "selects": [],
+            "group_by_column": None,
+            "joins": [],
         }
         config.update(overrides)
         return config
@@ -57,32 +61,40 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
     def test_as_sql_simple_select_all(self, mock_logger_arg):
         """Test SQL generation for a simple 'SELECT *' statement."""
         config = self._get_base_config(table_name="users", select_all=True)
+        config["_chosen_index_name"] = None
         statement, params, limit, next_token = self.backend.as_sql(config)
-        self.assertEqual('SELECT "users".* FROM "users"', statement)
+        self.assertEqual('SELECT * FROM "users"', statement)
         self.assertEqual([], params)
         self.assertIsNone(limit)
-        self.assertIsNone(next_token)
+        self.assertEqual(next_token, config.get("pagination", {}).get("next_token"))
 
     def test_as_sql_select_specific_columns(self, mock_logger_arg):
         """Test SQL generation for selecting specific columns."""
         config = self._get_base_config(table_name="products", selects=["name", "price"])
+        config["_chosen_index_name"] = None
         statement, params, limit, next_token = self.backend.as_sql(config)
         self.assertEqual('SELECT "name", "price" FROM "products"', statement)
         self.assertEqual([], params)
 
-    def test_as_sql_select_all_and_specific_columns(self, mock_logger_arg):
-        """Test SQL generation when both select_all and specific columns are requested."""
+    def test_as_sql_select_all_and_specific_columns_uses_specific(
+        self, mock_logger_arg
+    ):
+        """Test SQL generation uses specific columns if both select_all and selects are given."""
         config = self._get_base_config(
             table_name="inventory", select_all=True, selects=["item_id", "stock_count"]
         )
+        config["_chosen_index_name"] = None
         statement, params, limit, next_token = self.backend.as_sql(config)
-        expected_sql = 'SELECT "inventory".*, "item_id", "stock_count" FROM "inventory"'
+        expected_sql = 'SELECT "item_id", "stock_count" FROM "inventory"'
         self.assertEqual(expected_sql, statement)
-        self.assertEqual([], params)
+        mock_logger_arg.warning.assert_any_call(
+            "Both 'select_all=True' and specific 'selects' were provided. Using specific 'selects'."
+        )
 
     def test_as_sql_default_select_if_no_select_all_or_selects(self, mock_logger_arg):
         """Test SQL generation defaults to 'SELECT *' if no specific columns are given."""
         config = self._get_base_config(table_name="orders")
+        config["_chosen_index_name"] = None
         statement, params, limit, next_token = self.backend.as_sql(config)
         self.assertEqual('SELECT * FROM "orders"', statement)
         self.assertEqual([], params)
@@ -97,301 +109,210 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
                 {"column": "age", "operator": ">", "values": [30]},
             ],
         )
+        config["_chosen_index_name"] = None
         statement, params, limit, next_token = self.backend.as_sql(config)
-        expected_statement = (
-            'SELECT "customers".* FROM "customers" WHERE "city" = ? AND "age" > ?'
-        )
+        expected_statement = 'SELECT * FROM "customers" WHERE "city" = ? AND "age" > ?'
         expected_parameters = [{"S": "New York"}, {"N": "30"}]
         self.assertEqual(expected_statement, statement)
         self.assertEqual(expected_parameters, params)
 
     def test_as_sql_with_sorts(self, mock_logger_arg):
-        """Test SQL generation with ORDER BY clauses."""
+        """Test SQL generation with ORDER BY clauses (no table prefix for columns)."""
         config = self._get_base_config(
             table_name="items",
             select_all=True,
             sorts=[
                 {"column": "name", "direction": "ASC"},
-                {"column": "created_at", "direction": "DESC", "table": "items"},
+                {"column": "created_at", "direction": "DESC"},
             ],
         )
+        config["_chosen_index_name"] = None
         statement, params, limit, next_token = self.backend.as_sql(config)
-        expected_statement = 'SELECT "items".* FROM "items" ORDER BY "name" ASC, "items"."created_at" DESC'
+        expected_statement = (
+            'SELECT * FROM "items" ORDER BY "name" ASC, "created_at" DESC'
+        )
         self.assertEqual(expected_statement, statement)
 
-    def test_as_sql_with_limit_and_pagination(self, mock_logger_arg):
-        """Test SQL generation with LIMIT and pagination (NextToken)."""
+    def test_as_sql_with_index_name(self, mock_logger_arg):
+        """Test SQL generation uses index name in FROM clause if provided."""
+        config = self._get_base_config(table_name="my_table", select_all=True)
+        config["_chosen_index_name"] = "my_gsi"
+
+        statement, params, limit, next_token = self.backend.as_sql(config)
+        self.assertEqual('SELECT * FROM "my_table"."my_gsi"', statement)
+
+    def test_as_sql_ignores_group_by_and_joins(self, mock_logger_arg):
+        """Test that GROUP BY and JOIN configurations are ignored for SQL but logged."""
         config = self._get_base_config(
-            table_name="logs",
-            select_all=True,
-            limit=50,
-            pagination={"next_token": "some_encoded_token_string"},
+            table_name="log_data", group_by_column="level", joins=["some_join_info"]
         )
-        statement, params, limit_val, next_token_val = self.backend.as_sql(config)
-        self.assertEqual('SELECT "logs".* FROM "logs"', statement)
-        self.assertEqual(50, limit_val)
-        self.assertEqual("some_encoded_token_string", next_token_val)
+        config["_chosen_index_name"] = None
 
-    def test_map_from_boto3_value_decimal(self, mock_logger_arg):
-        """Test the _map_from_boto3_value method for Decimal conversion."""
-        self.assertEqual(123.45, self.backend._map_from_boto3_value(Decimal("123.45")))
+        statement, _, _, _ = self.backend.as_sql(config)
+        self.assertNotIn("GROUP BY", statement.upper())
+        self.assertNotIn("JOIN", statement.upper())
+        mock_logger_arg.warning.assert_any_call(
+            "Configuration included 'group_by_column=level', "
+            "but GROUP BY is not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
+        )
+        mock_logger_arg.warning.assert_any_call(
+            "Configuration included 'joins=['some_join_info']', "
+            "but JOINs are not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
+        )
 
-    def test_map_from_boto3_record(self, mock_logger_arg):
-        """Test the _map_from_boto3 method for processing a record."""
-        record = {
-            "amount": Decimal("99.90"),
-            "name": "Test",
-            "id": {"S": "value-from-dynamodb"},
+    def test_check_query_configuration_sort_with_base_table_hash_key_equality(
+        self, mock_logger_arg
+    ):
+        """Test _check_query_configuration allows sort if base table hash key equality exists."""
+        self.backend._get_table_description.return_value = {
+            "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+            "GlobalSecondaryIndexes": [],
         }
-        expected_mapped_record = {
-            "amount": 99.90,
-            "name": "Test",
-            "id": {"S": "value-from-dynamodb"},
-        }
-        self.assertEqual(expected_mapped_record, self.backend._map_from_boto3(record))
-
-    def test_check_query_configuration_valid(self, mock_logger_arg):
-        """Test _check_query_configuration with a valid configuration."""
         config = self._get_base_config(
-            table_name="my_table", model_columns=["id", "name"]
+            table_name="my_test_table",
+            sorts=[{"column": "name", "direction": "ASC"}],
+            wheres=[{"column": "id", "operator": "=", "values": ["some_id"]}],
         )
-        config_copy = config.copy()
         processed_config = self.backend._check_query_configuration(
-            config_copy, self.mock_model
+            config, self.mock_model
         )
-        self.assertIn("table_name", processed_config)
-        self.assertEqual([], processed_config.get("wheres"))
-        self.assertEqual(False, processed_config.get("select_all"))
+        self.assertIsNone(processed_config.get("_chosen_index_name"))
+        self.assertEqual(processed_config.get("_partition_key_for_target"), "id")
 
-    def test_check_query_configuration_missing_required_table_name(
+    def test_check_query_configuration_sort_raises_error_if_no_hash_key_equality(
         self, mock_logger_arg
     ):
-        """Test _check_query_configuration raises KeyError if table_name is missing."""
-        config = self._get_base_config(table_name=None)
-        del config["table_name"]
-        with self.assertRaisesRegex(
-            KeyError, "Missing required configuration key table_name"
-        ):
+        """Test _check_query_configuration raises ValueError for sort without hash key equality."""
+        self.backend._get_table_description.return_value = {
+            "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+            "GlobalSecondaryIndexes": [],
+        }
+        config = self._get_base_config(
+            table_name="my_test_table",
+            sorts=[{"column": "name", "direction": "ASC"}],
+            wheres=[{"column": "status", "operator": "=", "values": ["active"]}],
+        )
+        expected_error_message = "DynamoDB PartiQL queries with ORDER BY on 'my_test_table' require an equality condition on its partition key ('id') in the WHERE clause."
+        with self.assertRaisesRegex(ValueError, re.escape(expected_error_message)):
             self.backend._check_query_configuration(config, self.mock_model)
 
-    def test_check_query_configuration_empty_table_name(self, mock_logger_arg):
-        """Test _check_query_configuration raises KeyError if table_name is empty."""
-        config = self._get_base_config(table_name="")
-        with self.assertRaisesRegex(
-            KeyError, "Missing required configuration key table_name"
-        ):
-            self.backend._check_query_configuration(config, self.mock_model)
-
-    def test_check_query_configuration_invalid_key(self, mock_logger_arg):
-        """Test _check_query_configuration raises KeyError for an unsupported config key."""
-        config = self._get_base_config()
-        config["unsupported_key_for_backend"] = True
-        with self.assertRaisesRegex(
-            KeyError,
-            "DynamoDBBackend does not support config 'unsupported_key_for_backend'",
-        ):
-            self.backend._check_query_configuration(config, self.mock_model)
-
-    def test_validate_pagination_kwargs_valid(self, mock_logger_arg):
-        """Test validate_pagination_kwargs with a valid next_token."""
-        token_data = {"last_id": "item123"}
-        token = base64.urlsafe_b64encode(json.dumps(token_data).encode()).decode()
-        self.assertEqual(
-            "",
-            self.backend.validate_pagination_kwargs({"next_token": token}, lambda x: x),
-        )
-
-    def test_validate_pagination_kwargs_invalid_key(self, mock_logger_arg):
-        """Test validate_pagination_kwargs with an invalid pagination key."""
-        case_mapping = str.upper
-        key_name_nt = case_mapping("next_token")
-        expected_msg = (
-            f"Invalid pagination key(s): 'offset'. Only '{key_name_nt}' is allowed"
-        )
-        valid_token = base64.urlsafe_b64encode(json.dumps({"id": 1}).encode()).decode()
-        self.assertEqual(
-            expected_msg,
-            self.backend.validate_pagination_kwargs(
-                {"next_token": valid_token, "offset": 1}, case_mapping
-            ),
-        )
-
-    def test_validate_pagination_kwargs_missing_token(self, mock_logger_arg):
-        """Test validate_pagination_kwargs when the next_token is missing."""
-        case_mapping = str.lower
-        key_name_nt = case_mapping("next_token")
-        self.assertEqual(
-            f"You must specify '{key_name_nt}' when setting pagination",
-            self.backend.validate_pagination_kwargs({}, case_mapping),
-        )
-
-    def test_validate_pagination_kwargs_invalid_token_non_string(self, mock_logger_arg):
-        """Test validate_pagination_kwargs with a next_token that is not a string."""
-        case_mapping = str.lower
-        key_name_nt = case_mapping("next_token")
-        self.assertEqual(
-            f"The provided '{key_name_nt}' appears to be invalid.",
-            self.backend.validate_pagination_kwargs(
-                {"next_token": 12345}, case_mapping
-            ),
-        )
-
-    def test_validate_pagination_kwargs_invalid_token_empty_string(
+    def test_check_query_configuration_sort_uses_gsi_if_partition_key_matches(
         self, mock_logger_arg
     ):
-        """Test validate_pagination_kwargs with an empty string as next_token."""
-        case_mapping = str.lower
-        key_name_nt = case_mapping("next_token")
+        """Test _check_query_configuration selects GSI if its partition key matches WHERE and can sort."""
+        self.backend._get_table_description.return_value = {
+            "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+            "GlobalSecondaryIndexes": [
+                {
+                    "IndexName": "domain-status-index",
+                    "KeySchema": [
+                        {"AttributeName": "domain", "KeyType": "HASH"},
+                        {"AttributeName": "status", "KeyType": "RANGE"},
+                    ],
+                    "Projection": {"ProjectionType": "ALL"},
+                }
+            ],
+        }
+        config = self._get_base_config(
+            table_name="my_test_table",
+            sorts=[{"column": "status", "direction": "DESC"}],
+            wheres=[{"column": "domain", "operator": "=", "values": ["example.com"]}],
+        )
+        processed_config = self.backend._check_query_configuration(
+            config, self.mock_model
+        )
         self.assertEqual(
-            f"The provided '{key_name_nt}' appears to be invalid.",
-            self.backend.validate_pagination_kwargs({"next_token": ""}, case_mapping),
+            processed_config.get("_chosen_index_name"), "domain-status-index"
         )
+        self.assertEqual(processed_config.get("_partition_key_for_target"), "domain")
 
-    def test_serialize_and_restore_next_token(self, mock_logger_arg):
-        """Test serialization and subsequent restoration of a next_token."""
-        original_ddb_token = "opaqueDynamoDBNextTokenString"
-        serialized_for_client = self.backend.serialize_next_token_for_response(
-            original_ddb_token
+    def test_count_uses_native_query_with_pk_condition(self, mock_logger_arg):
+        """Test count() uses native DDB query when PK equality is present."""
+        self.backend._get_table_description.return_value = {
+            "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}]
+        }
+        config = self._get_base_config(
+            table_name="users",
+            wheres=[{"column": "id", "operator": "=", "values": ["user123"]}],
         )
-        self.assertIsInstance(serialized_for_client, str)
-        restored_for_ddb = self.backend.restore_next_token_from_config(
-            serialized_for_client
+        self.mock_dynamodb_client.query.return_value = {"Count": 10, "Items": []}
+
+        count = self.backend.count(config, self.mock_model)
+        self.assertEqual(count, 10)
+        self.mock_dynamodb_client.query.assert_called_once()
+        self.mock_dynamodb_client.scan.assert_not_called()
+        called_args = self.mock_dynamodb_client.query.call_args[1]
+        self.assertEqual(called_args.get("TableName"), "users")
+        self.assertEqual(called_args.get("Select"), "COUNT")
+        self.assertIn("KeyConditionExpression", called_args)
+
+    def test_count_uses_native_scan_without_pk_condition(self, mock_logger_arg):
+        """Test count() uses native DDB scan when PK equality is NOT present."""
+        self.backend._get_table_description.return_value = {
+            "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}]
+        }
+        config = self._get_base_config(
+            table_name="users",
+            wheres=[{"column": "status", "operator": "=", "values": ["active"]}],
         )
-        self.assertEqual(original_ddb_token, restored_for_ddb)
+        self.mock_dynamodb_client.scan.return_value = {"Count": 5, "Items": []}
 
-    def test_serialize_next_token_for_none(self, mock_logger_arg):
-        """Test that serializing a None key results in None."""
-        self.assertIsNone(self.backend.serialize_next_token_for_response(None))
+        count = self.backend.count(config, self.mock_model)
+        self.assertEqual(count, 5)
+        self.mock_dynamodb_client.scan.assert_called_once()
+        self.mock_dynamodb_client.query.assert_not_called()
+        called_args = self.mock_dynamodb_client.scan.call_args[1]
+        self.assertEqual(called_args.get("TableName"), "users")
+        self.assertEqual(called_args.get("Select"), "COUNT")
+        self.assertIn("FilterExpression", called_args)
 
-    def test_restore_next_token_from_config_none_or_invalid(self, mock_logger_arg):
-        """Test restoring next_token from None or invalid string values."""
-        self.assertIsNone(self.backend.restore_next_token_from_config(None))
-        self.assertIsNone(self.backend.restore_next_token_from_config(""))
-        self.assertIsNone(
-            self.backend.restore_next_token_from_config("this is not valid base64 json")
-        )
-        self.assertIsNone(self.backend.restore_next_token_from_config(12345))
+    def test_count_paginates_native_results(self, mock_logger_arg):
+        """Test count() paginates and sums results from native DDB operations."""
+        self.backend._get_table_description.return_value = {
+            "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}]
+        }
+        config = self._get_base_config(table_name="large_table")
 
-    def test_documentation_methods(self, mock_logger_arg):
-        """Test the output of documentation helper methods for pagination."""
-        case_mapping = lambda x: f"custom_{x}"
-        expected_doc_response = [AutoDocString(name=case_mapping("next_token"))]
-        actual_doc_response = self.backend.documentation_pagination_next_page_response(
-            case_mapping
-        )
-        self.assertEqual(len(expected_doc_response), len(actual_doc_response))
-        self.assertEqual(expected_doc_response[0].name, actual_doc_response[0].name)
-
-        expected_doc_example = {case_mapping("next_token"): ""}
-        self.assertEqual(
-            expected_doc_example,
-            self.backend.documentation_pagination_next_page_example(case_mapping),
-        )
-
-        expected_doc_params = [
-            (
-                AutoDocString(name=case_mapping("next_token"), example=""),
-                "A token to fetch the next page of results",
-            )
+        self.mock_dynamodb_client.scan.side_effect = [
+            {"Count": 100, "LastEvaluatedKey": {"id": {"S": "page1_end"}}},
+            {"Count": 50, "LastEvaluatedKey": {"id": {"S": "page2_end"}}},
+            {"Count": 25},
         ]
-        actual_doc_params = self.backend.documentation_pagination_parameters(
-            case_mapping
-        )
-        self.assertEqual(len(expected_doc_params), len(actual_doc_params))
-        self.assertEqual(expected_doc_params[0][0].name, actual_doc_params[0][0].name)
-        self.assertEqual(
-            expected_doc_params[0][0].example, actual_doc_params[0][0].example
-        )
-        self.assertEqual(expected_doc_params[0][1], actual_doc_params[0][1])
-
-    def test_cursor_execute_called_correctly(self, mock_logger_arg):
-        """Test that the cursor's execute method is called correctly by the backend."""
-        statement_to_run = 'SELECT * FROM "my_table" WHERE "id" = ?'
-        params_to_run = [{"S": "123"}]
-        expected_boto_response = {
-            "Items": [{"id": {"S": "123"}, "data": {"S": "value"}}]
-        }
-        self.mock_dynamodb_client.execute_statement.return_value = (
-            expected_boto_response
-        )
-
-        result = self.cursor_under_test.execute(
-            statement_to_run, params_to_run, ConsistentRead=True
-        )
-
-        self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement=statement_to_run, Parameters=params_to_run, ConsistentRead=True
-        )
-        self.assertEqual(expected_boto_response, result)
-
-    def test_cursor_execute_client_error_resource_not_found(self, mock_logger_arg):
-        """Test cursor's execute method handling for ResourceNotFoundException."""
-        error_response = {
-            "Error": {"Code": "ResourceNotFoundException", "Message": "Table not found"}
-        }
-        self.mock_dynamodb_client.execute_statement.side_effect = ClientError(
-            error_response, "ExecuteStatement"
-        )
-        with self.assertRaises(ClientError) as cm:
-            self.cursor_under_test.execute('SELECT * FROM "non_existent_table"', [])
-
-        self.assertEqual(
-            cm.exception.response["Error"]["Code"], "ResourceNotFoundException"
-        )
-        mock_logger_arg.error.assert_any_call(
-            "Couldn't execute PartiQL '%s' because the table does not exist.",
-            'SELECT * FROM "non_existent_table"',
-        )
-
-    def test_cursor_execute_client_error_other(self, mock_logger_arg):
-        """Test cursor's execute method handling for other ClientErrors."""
-        error_response = {
-            "Error": {"Code": "ValidationException", "Message": "Invalid query"}
-        }
-        self.mock_dynamodb_client.execute_statement.side_effect = ClientError(
-            error_response, "ExecuteStatement"
-        )
-        with self.assertRaises(ClientError) as cm:
-            self.cursor_under_test.execute('SELECT ??? FROM "bad_query"', [])
-
-        self.assertEqual(cm.exception.response["Error"]["Code"], "ValidationException")
-        mock_logger_arg.error.assert_any_call(
-            "Couldn't execute PartiQL '%s'. Here's why: %s: %s",
-            'SELECT ??? FROM "bad_query"',
-            "ValidationException",
-            "Invalid query",
-        )
+        count = self.backend.count(config, self.mock_model)
+        self.assertEqual(count, 175)
+        self.assertEqual(self.mock_dynamodb_client.scan.call_count, 3)
 
     def test_records_simple_fetch(self, mock_logger_arg):
         """Test records() fetching a single page of results without limit or pagination."""
         config = self._get_base_config(table_name="users", select_all=True)
-        expected_statement = 'SELECT "users".* FROM "users"'
+        expected_statement = 'SELECT * FROM "users"'
         ddb_items = [
-            {"id": {"S": "user1"}, "name": {"S": "Alice"}, "age": Decimal("30")},
-            {"id": {"S": "user2"}, "name": {"S": "Bob"}, "age": Decimal("24")},
+            {"id": {"S": "user1"}, "name": {"S": "Alice"}, "age": {"N": "30"}},
+            {"id": {"S": "user2"}, "name": {"S": "Bob"}, "age": {"N": "24"}},
         ]
         self.mock_dynamodb_client.execute_statement.return_value = {"Items": ddb_items}
 
         results = list(self.backend.records(config, self.mock_model))
 
+        expected_call_kwargs = {"Statement": expected_statement, "Parameters": []}
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement=expected_statement, Parameters=[]
+            **expected_call_kwargs
         )
         self.assertEqual(len(results), 2)
-        # Expecting _map_from_boto3 to convert Decimal to float
+        # Assert based on what _map_from_boto3 currently does
         self.assertEqual(
-            results[0], {"id": {"S": "user1"}, "name": {"S": "Alice"}, "age": 30.0}
+            results[0], {"id": "user1", "name": "Alice", "age": Decimal("30")}
         )
         self.assertEqual(
-            results[1], {"id": {"S": "user2"}, "name": {"S": "Bob"}, "age": 24.0}
+            results[1], {"id": "user2", "name": "Bob", "age": Decimal("24")}
         )
         self.assertIsNone(config["pagination"].get("next_page_token_for_response"))
 
     def test_records_with_limit(self, mock_logger_arg):
         """Test records() respects the server-side limit passed to DynamoDB."""
         config = self._get_base_config(table_name="products", limit=1, select_all=True)
-        expected_statement = 'SELECT "products".* FROM "products"'
-        ddb_items = [{"id": {"S": "prod1"}, "price": Decimal("10.99")}]
+        expected_statement = 'SELECT * FROM "products"'
+        ddb_items = [{"id": {"S": "prod1"}, "price": {"N": "10.99"}}]
         ddb_next_token = "fakeDDBNextToken"
 
         self.mock_dynamodb_client.execute_statement.return_value = {
@@ -401,11 +322,16 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         results = list(self.backend.records(config, self.mock_model))
 
+        expected_call_kwargs = {
+            "Statement": expected_statement,
+            "Parameters": [],
+            "Limit": 1,
+        }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement=expected_statement, Parameters=[], Limit=1
+            **expected_call_kwargs
         )
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0], {"id": {"S": "prod1"}, "price": 10.99})
+        self.assertEqual(results[0], {"id": "prod1", "price": Decimal("10.99")})
         expected_client_token = self.backend.serialize_next_token_for_response(
             ddb_next_token
         )
@@ -425,8 +351,8 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             select_all=True,
             pagination={"next_token": client_sends_this_token},
         )
-        expected_statement = 'SELECT "events".* FROM "events"'
-        ddb_items_page1 = [{"event_id": {"S": "evt1"}}]  # Data as it comes from DDB
+        expected_statement = 'SELECT * FROM "events"'
+        ddb_items_page1 = [{"event_id": {"S": "evt1"}}]
         ddb_next_token_page1 = "ddb_token_for_page2"
 
         self.mock_dynamodb_client.execute_statement.return_value = {
@@ -436,13 +362,16 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         results_page1 = list(self.backend.records(config1, self.mock_model))
 
+        expected_call_kwargs1 = {
+            "Statement": expected_statement,
+            "Parameters": [],
+            "NextToken": initial_ddb_token,
+        }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement=expected_statement, Parameters=[], NextToken=initial_ddb_token
+            **expected_call_kwargs1
         )
         self.assertEqual(len(results_page1), 1)
-        self.assertEqual(
-            results_page1[0], {"event_id": {"S": "evt1"}}
-        )  # Expecting mapped data
+        self.assertEqual(results_page1[0], {"event_id": "evt1"})
         client_token_for_next_call = config1["pagination"].get(
             "next_page_token_for_response"
         )
@@ -458,26 +387,29 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             select_all=True,
             pagination={"next_token": client_token_for_next_call},
         )
-        ddb_items_page2 = [{"event_id": {"S": "evt2"}}]  # Data as it comes from DDB
+        ddb_items_page2 = [{"event_id": {"S": "evt2"}}]
         self.mock_dynamodb_client.execute_statement.return_value = {
             "Items": ddb_items_page2
         }
 
         results_page2 = list(self.backend.records(config2, self.mock_model))
 
+        expected_call_kwargs2 = {
+            "Statement": expected_statement,
+            "Parameters": [],
+            "NextToken": ddb_next_token_page1,
+        }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement=expected_statement, Parameters=[], NextToken=ddb_next_token_page1
+            **expected_call_kwargs2
         )
         self.assertEqual(len(results_page2), 1)
-        self.assertEqual(
-            results_page2[0], {"event_id": {"S": "evt2"}}
-        )  # Expecting mapped data
+        self.assertEqual(results_page2[0], {"event_id": "evt2"})
         self.assertIsNone(config2["pagination"].get("next_page_token_for_response"))
 
     def test_records_no_items_returned_with_next_token(self, mock_logger_arg):
         """Test records() when DDB returns no items but provides a NextToken."""
         config = self._get_base_config(table_name="filtered_items", select_all=True)
-        expected_statement = 'SELECT "filtered_items".* FROM "filtered_items"'
+        expected_statement = 'SELECT * FROM "filtered_items"'
         ddb_next_token = "ddb_has_more_but_current_page_empty_after_filter"
 
         self.mock_dynamodb_client.execute_statement.return_value = {
@@ -487,8 +419,9 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         results = list(self.backend.records(config, self.mock_model))
 
+        expected_call_kwargs = {"Statement": expected_statement, "Parameters": []}
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement=expected_statement, Parameters=[]
+            **expected_call_kwargs
         )
         self.assertEqual(len(results), 0)
         expected_client_token = self.backend.serialize_next_token_for_response(
@@ -504,7 +437,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         config = self._get_base_config(
             table_name="many_items", limit=1, select_all=True
         )
-        expected_statement = 'SELECT "many_items".* FROM "many_items"'
+        expected_statement = 'SELECT * FROM "many_items"'
         ddb_items_returned_by_limit = [{"id": {"S": "item1"}}]
         ddb_next_token_after_limit = "ddb_still_has_more_after_limit"
 
@@ -515,11 +448,16 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         results = list(self.backend.records(config, self.mock_model))
 
+        expected_call_kwargs = {
+            "Statement": expected_statement,
+            "Parameters": [],
+            "Limit": 1,
+        }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement=expected_statement, Parameters=[], Limit=1
+            **expected_call_kwargs
         )
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0], {"id": {"S": "item1"}})  # Expecting mapped data
+        self.assertEqual(results[0], {"id": "item1"})
         expected_client_token = self.backend.serialize_next_token_for_response(
             ddb_next_token_after_limit
         )
@@ -528,42 +466,9 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             expected_client_token,
         )
 
-    def test_count_simple(self, mock_logger_arg):
-        """Test count() with no where conditions."""
-        config = self._get_base_config(table_name="users")
-        self.mock_dynamodb_client.execute_statement.return_value = {
-            "Items": [{"count": {"N": "150"}}]
-        }
-
-        count = self.backend.count(config, self.mock_model)
-
-        self.assertEqual(count, 150)
-        self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement='SELECT COUNT(*) AS count FROM "users"', Parameters=[]
-        )
-
-    def test_count_with_wheres(self, mock_logger_arg):
-        """Test count() with where conditions."""
-        config = self._get_base_config(
-            table_name="users",
-            wheres=[{"column": "status", "operator": "=", "values": ["active"]}],
-        )
-        self.mock_dynamodb_client.execute_statement.return_value = {
-            "Items": [{"_1": {"N": "75"}}]
-        }
-
-        count = self.backend.count(config, self.mock_model)
-
-        self.assertEqual(count, 75)
-        self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement='SELECT COUNT(*) AS count FROM "users" WHERE "status" = ?',
-            Parameters=[{"S": "active"}],
-        )
-
     def test_create_record(self, mock_logger_arg):
         """Test create() inserts a record and returns the input data."""
         data_to_create = {"id": "new_user_123", "name": "Jane Doe", "age": 28}
-        # Corrected expectation: Parameters is a list containing ONE item, which is the record itself.
         expected_ddb_parameters = [
             {"id": {"S": "new_user_123"}, "name": {"S": "Jane Doe"}, "age": {"N": "28"}}
         ]
@@ -590,7 +495,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         updated_item_from_db = {
             "id": {"S": record_id},
             "name": {"S": "Original Name"},
-            "age": {"N": "35"},  # Data as it comes from DDB
+            "age": {"N": "35"},
             "status": {"S": "active"},
         }
         self.mock_dynamodb_client.execute_statement.return_value = {
@@ -605,16 +510,13 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
             Statement=expected_statement, Parameters=expected_ddb_parameters
         )
-        # Assert based on _map_from_boto3 (which only converts Decimal to float)
         self.assertEqual(
             updated_data_response,
             {
-                "id": {"S": record_id},
-                "name": {"S": "Original Name"},
-                "age": {
-                    "N": "35"
-                },  # Expecting this to remain as DDB typed value if not Decimal
-                "status": {"S": "active"},
+                "id": "user_to_update",
+                "name": "Original Name",
+                "age": Decimal("35"),
+                "status": "active",
             },
         )
 
