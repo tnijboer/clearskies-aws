@@ -1,8 +1,10 @@
 import unittest
 from unittest.mock import MagicMock, call
-from .ses import SES
-import clearskies
+
 from ..di import StandardDependencies
+from .ses import SES
+
+
 class SESTest(unittest.TestCase):
     def setUp(self):
         self.di = StandardDependencies()

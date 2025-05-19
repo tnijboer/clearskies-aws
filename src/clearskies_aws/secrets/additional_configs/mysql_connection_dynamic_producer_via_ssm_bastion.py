@@ -1,9 +1,13 @@
-from .mysql_connection_dynamic_producer_via_ssh_cert_bastion import MySQLConnectionDynamicProducerViaSSHCertBastion as Base
-from pathlib import Path
+import os
 import socket
 import subprocess
-import os
 import time
+
+from .mysql_connection_dynamic_producer_via_ssh_cert_bastion import (
+    MySQLConnectionDynamicProducerViaSSHCertBastion as Base,
+)
+
+
 class MySQLConnectionDynamicProducerViaSSMBastion(Base):
     _config = None
     _boto3 = None
@@ -80,7 +84,7 @@ class MySQLConnectionDynamicProducerViaSSMBastion(Base):
             bastion_region = self._fetch_config(environment, 'bastion_region', 'mysql_bastion_region')
             return self._instance_id_from_name(bastion_name, bastion_region)
         raise ValueError(
-            f"I was asked to connect to a database via an AKeyless dynamic producer through an SSH bastion with certificate auth, but I'm missing some configuration. I need either the bastion host or the name of the instance in AWS.  These can be set in the call to `clearskies.backends.akeyless_aws.mysql_connection_dynamic_producer_via_ssh_cert_bastion()` by providing the 'bastion_host' or 'bastion_name' argument, or by setting an environment variable named 'akeyless_mysql_bastion_host' or 'akeyless_mysql_bastion_name'."
+            "I was asked to connect to a database via an AKeyless dynamic producer through an SSH bastion with certificate auth, but I'm missing some configuration. I need either the bastion host or the name of the instance in AWS.  These can be set in the call to `clearskies.backends.akeyless_aws.mysql_connection_dynamic_producer_via_ssh_cert_bastion()` by providing the 'bastion_host' or 'bastion_name' argument, or by setting an environment variable named 'akeyless_mysql_bastion_host' or 'akeyless_mysql_bastion_name'."
         )
 
     def _instance_id_from_name(self, bastion_name, bastion_region):

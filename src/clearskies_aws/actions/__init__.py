@@ -1,12 +1,14 @@
-import clearskies
+from typing import Callable, Optional, Union
 
-from typing import Optional, Callable, Union
+import clearskies
 
 from .assume_role import AssumeRole
 from .ses import SES
 from .sns import SNS
 from .sqs import SQS
 from .step_function import StepFunction
+
+
 def ses(
     sender,
     to=None,
@@ -105,4 +107,16 @@ def assume_role(
         duration=duration,
         source=source,
     )
-__all__ = [assume_role, AssumeRole, ses, SES, sns, SNS, step_function, StepFunction, sqs, SQS]
+
+__all__ = [
+    "assume_role",
+    "AssumeRole",
+    "ses",
+    "SES",
+    "sns",
+    "SNS",
+    "step_function",
+    "StepFunction",
+    "sqs",
+    "SQS",
+]

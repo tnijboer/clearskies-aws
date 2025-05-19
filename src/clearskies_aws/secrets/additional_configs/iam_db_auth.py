@@ -1,5 +1,8 @@
-import clearskies
 import os
+
+import clearskies
+
+
 class IAMDBAuth(clearskies.di.AdditionalConfig):
     def provide_boto3(self):
         import boto3

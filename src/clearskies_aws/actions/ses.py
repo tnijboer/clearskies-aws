@@ -1,17 +1,17 @@
+import datetime
+from types import ModuleType
+from typing import Any, Callable, List, Optional, Union
+
 import boto3
 import clearskies
-import datetime
-
-from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.models import Models
-from collections.abc import Sequence
-from typing import Any, Callable, List, Optional, Union
-from types import ModuleType
 
 from ..di import StandardDependencies
-from .assume_role import AssumeRole
 from .action_aws import ActionAws
+from .assume_role import AssumeRole
+
+
 class SES(ActionAws):
     _name = "ses"
 

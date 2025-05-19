@@ -1,8 +1,9 @@
 import json
 import unittest
-from unittest.mock import MagicMock, call
-from types import SimpleNamespace
+
 from .lambda_sqs_standard_partial_batch import lambda_sqs_standard_partial_batch
+
+
 class LambdaSqsStandardPartialBatchTest(unittest.TestCase):
     def setUp(self):
         self.calls = []
@@ -29,14 +30,10 @@ class LambdaSqsStandardPartialBatchTest(unittest.TestCase):
             },
             {},
         )
-        self.assertEquals(
+        self.assertEqual(
             [
-                {
-                    'hey': 'sup'
-                },
-                {
-                    'cool': 'yo'
-                },
+                {"hey": "sup"},
+                {"cool": "yo"},
             ],
             self.calls,
         )
@@ -55,17 +52,13 @@ class LambdaSqsStandardPartialBatchTest(unittest.TestCase):
                 },
             ]
         }, {})
-        self.assertEquals(
+        self.assertEqual(
             [
-                {
-                    'hey': 'sup'
-                },
+                {"hey": "sup"},
             ],
             self.calls,
         )
-        self.assertEquals(
-            {'batchItemFailures': [{
-                'itemIdentifier': '2-3-4-5'
-            }]},
+        self.assertEqual(
+            {"batchItemFailures": [{"itemIdentifier": "2-3-4-5"}]},
             results,
         )

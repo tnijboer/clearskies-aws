@@ -1,5 +1,7 @@
 from botocore.exceptions import ClientError
 from clearskies.secrets.exceptions import NotFound
+
+
 class SecretsManager:
     _boto3 = None
     _environment = None
