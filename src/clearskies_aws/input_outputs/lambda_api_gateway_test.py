@@ -1,6 +1,9 @@
 import unittest
-from .lambda_api_gateway import LambdaAPIGateway
 from collections import OrderedDict
+
+from .lambda_api_gateway import LambdaAPIGateway
+
+
 class LambdaAPIGatewayTest(unittest.TestCase):
     dummy_event = {
         'httpMethod': 'GET',
@@ -22,16 +25,21 @@ class LambdaAPIGatewayTest(unittest.TestCase):
         aws_lambda.set_header('hey', 'sup')
         aws_lambda.clear_header('bob')
         response = aws_lambda.respond({'some': 'data'}, 200)
-        self.assertEquals({
-            'isBase64Encoded':
-            False,
-            'statusCode':
-            200,
-            'headers':
-            OrderedDict([('JANE', 'kay'), ('HEY', 'sup'), ('CONTENT-TYPE', 'application/json; charset=UTF-8')]),
-            'body':
-            '{"some": "data"}',
-        }, response)
+        self.assertEqual(
+            {
+                "isBase64Encoded": False,
+                "statusCode": 200,
+                "headers": OrderedDict(
+                    [
+                        ("JANE", "kay"),
+                        ("HEY", "sup"),
+                        ("CONTENT-TYPE", "application/json; charset=UTF-8"),
+                    ]
+                ),
+                "body": '{"some": "data"}',
+            },
+            response,
+        )
 
     def test_headers(self):
         aws_lambda = LambdaAPIGateway({
@@ -44,8 +52,8 @@ class LambdaAPIGatewayTest(unittest.TestCase):
                 }
             }
         }, {})
-        self.assertEquals('hey', aws_lambda.get_request_header('authorizatiON'))
-        self.assertEquals('asdf', aws_lambda.get_request_header('x-auth'))
+        self.assertEqual("hey", aws_lambda.get_request_header("authorizatiON"))
+        self.assertEqual("asdf", aws_lambda.get_request_header("x-auth"))
         self.assertTrue(aws_lambda.has_request_header('authorization'))
         self.assertTrue(aws_lambda.has_request_header('x-auth'))
         self.assertFalse(aws_lambda.has_request_header('bearer'))
@@ -53,8 +61,8 @@ class LambdaAPIGatewayTest(unittest.TestCase):
     def test_body_plain(self):
         aws_lambda = LambdaAPIGateway({**self.dummy_event, **{'body': '{"hey": "sup"}', 'isBase64Encoded': False}}, {})
 
-        self.assertEquals({'hey': 'sup'}, aws_lambda.json_body())
-        self.assertEquals('{"hey": "sup"}', aws_lambda.get_body())
+        self.assertEqual({"hey": "sup"}, aws_lambda.json_body())
+        self.assertEqual('{"hey": "sup"}', aws_lambda.get_body())
         self.assertTrue(aws_lambda.has_body())
 
     def test_body_base64(self):
@@ -66,14 +74,14 @@ class LambdaAPIGatewayTest(unittest.TestCase):
             }
         }, {})
 
-        self.assertEquals({'hey': 'sup'}, aws_lambda.json_body())
-        self.assertEquals('{"hey": "sup"}', aws_lambda.get_body())
+        self.assertEqual({"hey": "sup"}, aws_lambda.json_body())
+        self.assertEqual('{"hey": "sup"}', aws_lambda.get_body())
         self.assertTrue(aws_lambda.has_body())
 
     def test_path(self):
         aws_lambda = LambdaAPIGateway(self.dummy_event, {})
-        self.assertEquals('/test', aws_lambda.get_path_info())
+        self.assertEqual("/test", aws_lambda.get_path_info())
 
     def test_query_string(self):
         aws_lambda = LambdaAPIGateway(self.dummy_event, {})
-        self.assertEquals('q=hey&bob=sup', aws_lambda.get_query_string())
+        self.assertEqual("q=hey&bob=sup", aws_lambda.get_query_string())
