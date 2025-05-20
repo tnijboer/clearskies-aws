@@ -291,20 +291,15 @@ class DynamoDBPartiQLBackend(CursorBackend):
             if sort_parts:
                 order_by = " ORDER BY " + ", ".join(sort_parts)
 
-        group_by_column_config: Optional[Union[str, List[str]]] = configuration.get(
-            "group_by_column"
-        )
-        if group_by_column_config:
+        if configuration.get("group_by_column"):
             logger.warning(
-                f"Configuration included 'group_by_column={group_by_column_config}', "
+                f"Configuration included 'group_by_column={configuration.get("group_by_column")}', "
                 "but GROUP BY is not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
             )
-        group_by: str = ""
 
-        joins_config: Optional[List[Any]] = configuration.get("joins")
-        if joins_config:
+        if configuration.get("joins"):
             logger.warning(
-                f"Configuration included 'joins={joins_config}', "
+                f"Configuration included 'joins={configuration.get("joins")}', "
                 "but JOINs are not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
             )
 
@@ -321,7 +316,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
             raise ValueError("Table name is required for constructing SQL query.")
 
         statement: str = (
-            f"SELECT {select_clause} FROM {from_clause_target}{wheres}{group_by}{order_by}".strip()
+            f"SELECT {select_clause} FROM {from_clause_target}{wheres}{order_by}".strip()
         )
 
         return statement, parameters, limit, next_token
@@ -330,7 +325,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         self,
         configuration: Dict[str, Any],
         model: ClearSkiesModel,
-        next_page_data: Optional[Any] = None,
+        next_page_data: dict[str, Any] = {},
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Fetches records from DynamoDB based on the provided configuration using PartiQL.
@@ -341,14 +336,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
             configuration
         )
 
-        current_client_token = (
-            next_page_data
-            if next_page_data is not None
-            else client_next_token_from_as_sql
-        )
-
         ddb_token_for_this_call: Optional[str] = self.restore_next_token_from_config(
-            current_client_token
+            client_next_token_from_as_sql
         )
 
         cursor_limit: Optional[int] = None
@@ -378,8 +367,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
 
         next_token_from_ddb: Optional[str] = response.get("NextToken")
         if next_token_from_ddb:
-            configuration["pagination"]["next_page_token_for_response"] = (
-                self.serialize_next_token_for_response(next_token_from_ddb)
+            next_page_data["next_token"] = self.serialize_next_token_for_response(
+                next_token_from_ddb
             )
 
     def _wheres_to_native_dynamo_expressions(
