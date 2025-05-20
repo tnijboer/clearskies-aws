@@ -247,23 +247,11 @@ class DynamoDBPartiQLBackend(CursorBackend):
             configuration.get("wheres", []), table_name
         )
 
-        select_parts: List[str] = []
         from_clause_target: str = self._finalize_table_name(
             table_name, chosen_index_name
         )
 
-        if configuration.get("select_all"):
-            select_parts.append("*")
-
         selects: Optional[List[str]] = configuration.get("selects")
-        if selects:
-            if configuration.get("select_all") and select_parts:
-                logger.warning(
-                    "Both 'select_all' and specific 'selects' are provided. Generating '*, col1, col2...'."
-                )
-
-            select_parts.extend([f"{escape}{s.strip(escape)}{escape}" for s in selects])
-
         select_clause: str
         if selects:
             select_clause = ", ".join(
@@ -273,8 +261,6 @@ class DynamoDBPartiQLBackend(CursorBackend):
                 logger.warning(
                     "Both 'select_all=True' and specific 'selects' were provided. Using specific 'selects'."
                 )
-        elif configuration.get("select_all"):
-            select_clause = "*"
         else:
             select_clause = "*"
 
@@ -355,12 +341,10 @@ class DynamoDBPartiQLBackend(CursorBackend):
             logger.error(
                 f"Error executing PartiQL statement in records(): {statement}, error: {e}"
             )
-            configuration["pagination"]["next_page_token_for_response"] = None
+            next_page_data = {}
             raise
 
         items_from_response: List[Dict[str, Any]] = response.get("Items", [])
-
-        configuration["pagination"]["next_page_token_for_response"] = None
 
         for item_raw in items_from_response:
             yield self._map_from_boto3(item_raw)

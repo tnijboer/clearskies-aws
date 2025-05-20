@@ -319,8 +319,8 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             "Items": ddb_items,
             "NextToken": ddb_next_token,
         }
-
-        results = list(self.backend.records(config, self.mock_model))
+        next_page_data = {}
+        results = list(self.backend.records(config, self.mock_model, next_page_data))
 
         expected_call_kwargs = {
             "Statement": expected_statement,
@@ -336,7 +336,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             ddb_next_token
         )
         self.assertEqual(
-            config["pagination"].get("next_page_token_for_response"),
+            next_page_data["next_token"],
             expected_client_token,
         )
 
@@ -359,8 +359,10 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             "Items": ddb_items_page1,
             "NextToken": ddb_next_token_page1,
         }
-
-        results_page1 = list(self.backend.records(config1, self.mock_model))
+        next_page_data = {}
+        results_page1 = list(
+            self.backend.records(config1, self.mock_model, next_page_data)
+        )
 
         expected_call_kwargs1 = {
             "Statement": expected_statement,
@@ -372,9 +374,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         )
         self.assertEqual(len(results_page1), 1)
         self.assertEqual(results_page1[0], {"event_id": "evt1"})
-        client_token_for_next_call = config1["pagination"].get(
-            "next_page_token_for_response"
-        )
+        client_token_for_next_call = next_page_data["next_token"]
         self.assertIsNotNone(client_token_for_next_call)
         self.assertEqual(
             self.backend.restore_next_token_from_config(client_token_for_next_call),
@@ -391,9 +391,10 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         self.mock_dynamodb_client.execute_statement.return_value = {
             "Items": ddb_items_page2
         }
-
-        results_page2 = list(self.backend.records(config2, self.mock_model))
-
+        next_page_data = {}
+        results_page2 = list(
+            self.backend.records(config2, self.mock_model, next_page_data)
+        )
         expected_call_kwargs2 = {
             "Statement": expected_statement,
             "Parameters": [],
@@ -404,7 +405,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         )
         self.assertEqual(len(results_page2), 1)
         self.assertEqual(results_page2[0], {"event_id": "evt2"})
-        self.assertIsNone(config2["pagination"].get("next_page_token_for_response"))
+        self.assertEqual(next_page_data, {})
 
     def test_records_no_items_returned_with_next_token(self, mock_logger_arg):
         """Test records() when DDB returns no items but provides a NextToken."""
@@ -416,8 +417,8 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             "Items": [],
             "NextToken": ddb_next_token,
         }
-
-        results = list(self.backend.records(config, self.mock_model))
+        next_page_data = {}
+        results = list(self.backend.records(config, self.mock_model, next_page_data))
 
         expected_call_kwargs = {"Statement": expected_statement, "Parameters": []}
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -428,7 +429,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             ddb_next_token
         )
         self.assertEqual(
-            config["pagination"].get("next_page_token_for_response"),
+            next_page_data["next_token"],
             expected_client_token,
         )
 
@@ -445,8 +446,8 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             "Items": ddb_items_returned_by_limit,
             "NextToken": ddb_next_token_after_limit,
         }
-
-        results = list(self.backend.records(config, self.mock_model))
+        next_page_data = {}
+        results = list(self.backend.records(config, self.mock_model, next_page_data))
 
         expected_call_kwargs = {
             "Statement": expected_statement,
@@ -462,7 +463,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
             ddb_next_token_after_limit
         )
         self.assertEqual(
-            config["pagination"].get("next_page_token_for_response"),
+            next_page_data["next_token"],
             expected_client_token,
         )
 
