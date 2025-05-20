@@ -1,14 +1,17 @@
-from clearskies.backends.backend import Backend
-from boto3.dynamodb import conditions as dynamodb_conditions
-from decimal import Decimal
-from clearskies.column_types.float import Float
-from clearskies.column_types.integer import Integer
-from clearskies.column_types.boolean import Boolean
-import json
 import base64
+import json
+from decimal import Decimal
 from typing import Any, Callable, Dict, List, Tuple
+
+from boto3.dynamodb import conditions as dynamodb_conditions
 from clearskies import model
 from clearskies.autodoc.schema import String as AutoDocString
+from clearskies.backends.backend import Backend
+from clearskies.column_types.boolean import Boolean
+from clearskies.column_types.float import Float
+from clearskies.column_types.integer import Integer
+
+
 class DynamoDBBackend(Backend):
     """
     DynamoDB is complicated.
