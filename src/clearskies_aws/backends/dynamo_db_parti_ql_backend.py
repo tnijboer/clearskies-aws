@@ -68,7 +68,10 @@ class DynamoDBPartiQLCursor:
         """
         try:
             call_args: ExecuteStatementInputTypeDef = {"Statement": statement}
-            if parameters is not None:
+            # Only include 'Parameters' if it's not None AND not empty
+            if (
+                parameters
+            ):  # This implies parameters is not None and parameters is not an empty list
                 call_args["Parameters"] = parameters
             if Limit is not None:
                 call_args["Limit"] = Limit

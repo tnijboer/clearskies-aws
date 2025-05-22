@@ -294,7 +294,9 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         results = list(self.backend.records(config, self.mock_model))
 
-        expected_call_kwargs = {"Statement": expected_statement, "Parameters": []}
+        expected_call_kwargs = {
+            "Statement": expected_statement,
+        }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
             **expected_call_kwargs
         )
@@ -324,7 +326,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         expected_call_kwargs = {
             "Statement": expected_statement,
-            "Parameters": [],
             "Limit": 1,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -366,7 +367,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         expected_call_kwargs1 = {
             "Statement": expected_statement,
-            "Parameters": [],
             "NextToken": initial_ddb_token,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -397,7 +397,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         )
         expected_call_kwargs2 = {
             "Statement": expected_statement,
-            "Parameters": [],
             "NextToken": ddb_next_token_page1,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -420,7 +419,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         next_page_data = {}
         results = list(self.backend.records(config, self.mock_model, next_page_data))
 
-        expected_call_kwargs = {"Statement": expected_statement, "Parameters": []}
+        expected_call_kwargs = {"Statement": expected_statement}
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
             **expected_call_kwargs
         )
@@ -451,7 +450,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         expected_call_kwargs = {
             "Statement": expected_statement,
-            "Parameters": [],
             "Limit": 1,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
