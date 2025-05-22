@@ -168,7 +168,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if not table_name:
             return ""
         esc: str = self._table_escape_character()
-        final_name = f"{esc}{table_name.strip(esc)}{esc}"
+        final_name = f"{esc}{str(table_name).strip(esc)}{esc}"
         if index_name:
             final_name += f".{esc}{index_name.strip(esc)}{esc}"
         return final_name
