@@ -2,7 +2,7 @@ import base64
 import binascii
 import json
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 from boto3.session import Session as Boto3Session
@@ -84,7 +84,7 @@ class DynamoDBPartiQLCursor:
                 **call_args
             )
         except ClientError as err:
-            error_response: Dict[str, Any] = err.response.get("Error", {})
+            error_response: Dict[str, Any] = err.response.get("Error", {})  # type: ignore
             error_code: str = error_response.get("Code", "UnknownCode")
             error_message: str = error_response.get("Message", "Unknown error")
 
@@ -117,6 +117,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
     The count() method uses native DynamoDB Query/Scan operations for accuracy.
     """
 
+    _cursor: DynamoDBPartiQLCursor
     _allowed_configs: List[str] = [
         "table_name",
         "wheres",
@@ -498,8 +499,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
                 table_description.get("GlobalSecondaryIndexes", [])
             )
             for gsi in gsi_definitions:
-                if gsi["IndexName"] == chosen_index_name:
-                    for key_element in gsi["KeySchema"]:
+                if gsi.get("IndexName", "") == chosen_index_name:
+                    for key_element in gsi.get("KeySchema", []):
                         if key_element["KeyType"] == "RANGE":
                             sort_key_for_target = key_element["AttributeName"]
                             break
@@ -602,18 +603,31 @@ class DynamoDBPartiQLBackend(CursorBackend):
         """
         Creates a new record in DynamoDB using PartiQL INSERT.
         """
-        table_name: str = self._finalize_table_name(model.table_name)  # type: ignore
+        table_name: str = self._finalize_table_name(model.get_table_name())
 
-        item_to_insert: Dict[str, AttributeValueTypeDef] = {
-            key: self.condition_parser.to_dynamodb_attribute_value(value)
-            for key, value in data.items()
-        }
+        if not data:
+            logger.warning("Create called with empty data. Nothing to insert.")
+            return {}
 
-        parameters: List[AttributeValueTypeDef] = [item_to_insert]  # type: ignore
-        statement = f"INSERT INTO {table_name} VALUE ?"
+        # Prepare parameters
+        parameters: List[AttributeValueTypeDef] = []
+
+        # Build the 'VALUE {key: ?, key: ?}' part and collect parameters
+        value_struct_parts: List[str] = []
+        for key, value in data.items():
+            # Use single quotes around the key to match PartiQL documentation examples
+            value_struct_parts.append(f"'{key}': ?")
+            parameters.append(self.condition_parser.to_dynamodb_attribute_value(value))
+        value_struct_clause = ", ".join(value_struct_parts)
+
+        # Construct the INSERT statement with explicit struct format
+        statement = f"INSERT INTO {table_name} VALUE {{{value_struct_clause}}}"
 
         try:
-            self._cursor.execute(statement=statement, parameters=parameters)
+            self._cursor.execute(
+                statement=statement,
+                parameters=parameters,
+            )
             return data
         except Exception as e:
             logger.error(
@@ -627,8 +641,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
         """
         Updates an existing record in DynamoDB using PartiQL UPDATE.
         """
-        table_name: str = self._finalize_table_name(model.table_name)  # type: ignore
-        id_column_name: str = model.id_column_name  # type: ignore
+        table_name: str = self._finalize_table_name(model.get_table_name())
+        id_column_name: str = model.id_column_name
         escaped_id_column: str = (
             f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
         )
@@ -682,13 +696,15 @@ class DynamoDBPartiQLBackend(CursorBackend):
         """
         Deletes a record from DynamoDB using PartiQL DELETE.
         """
-        table_name: str = self._finalize_table_name(model.table_name)  # type: ignore
-        id_column_name: str = model.id_column_name  # type: ignore
+        table_name: str = self._finalize_table_name(model.get_table_name())
+        id_column_name: str = model.id_column_name
         escaped_id_column: str = (
             f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
         )
 
-        parameters: List[AttributeValueTypeDef] = [self.condition_parser.to_dynamodb_attribute_value(id_value)]  # type: ignore
+        parameters: List[AttributeValueTypeDef] = [
+            self.condition_parser.to_dynamodb_attribute_value(id_value)
+        ]
         statement: str = f"DELETE FROM {table_name} WHERE {escaped_id_column} = ?"
 
         try:
@@ -734,7 +750,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if "N" in attribute_value:
             try:
                 return Decimal(attribute_value["N"])
-            except DecimalException:
+            except InvalidOperation:  # Changed from DecimalException
                 logger.warning(
                     f"Could not convert N value '{attribute_value['N']}' to Decimal."
                 )
@@ -744,7 +760,13 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if "NULL" in attribute_value:
             return None
         if "B" in attribute_value:
-            return base64.b64decode(attribute_value["B"])
+            try:
+                return base64.b64decode(attribute_value["B"])
+            except (binascii.Error, TypeError) as e:
+                logger.warning(
+                    f"Failed to decode base64 binary value: {attribute_value['B']}, error: {e}"
+                )
+                return attribute_value["B"]  # Return raw if decoding fails
         if "L" in attribute_value:
             return [self._map_from_boto3_value(item) for item in attribute_value["L"]]
         if "M" in attribute_value:
@@ -757,13 +779,19 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if "NS" in attribute_value:
             try:
                 return set(Decimal(n_val) for n_val in attribute_value["NS"])
-            except DecimalException:
+            except InvalidOperation:  # Changed from DecimalException
                 logger.warning(
                     f"Could not convert one or more NS values in '{attribute_value['NS']}' to Decimal."
                 )
                 return set(attribute_value["NS"])
         if "BS" in attribute_value:
-            return set(base64.b64decode(b_val) for b_val in attribute_value["BS"])
+            try:
+                return set(base64.b64decode(b_val) for b_val in attribute_value["BS"])
+            except (binascii.Error, TypeError) as e:
+                logger.warning(
+                    f"Failed to decode one or more base64 binary values in '{attribute_value['BS']}', error: {e}"
+                )
+                return set(attribute_value["BS"])  # Return raw if decoding fails
 
         logger.warning(f"Unrecognized DynamoDB attribute type: {attribute_value}")
         return attribute_value
