@@ -69,13 +69,11 @@ class DynamoDBPartiQLCursor:
         """
         try:
             call_args: ExecuteStatementInputTypeDef = {"Statement": statement}
-            print(statement)
             # Only include 'Parameters' if it's not None AND not empty
             if (
                 parameters
             ):  # This implies parameters is not None and parameters is not an empty list
                 call_args["Parameters"] = parameters
-                print(parameters)
             if Limit is not None:
                 call_args["Limit"] = Limit
             if NextToken is not None:
@@ -286,13 +284,13 @@ class DynamoDBPartiQLBackend(CursorBackend):
 
         if configuration.get("group_by_column"):
             logger.warning(
-                f"Configuration included 'group_by_column={configuration.get("group_by_column")}', "
+                "Configuration included 'group_by_column=" + configuration.get("group_by_column") + "', " +
                 "but GROUP BY is not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
             )
 
         if configuration.get("joins"):
             logger.warning(
-                f"Configuration included 'joins={configuration.get("joins")}', "
+                "Configuration included 'joins=" + str(configuration.get("joins")) + "', " +
                 "but JOINs are not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
             )
 
