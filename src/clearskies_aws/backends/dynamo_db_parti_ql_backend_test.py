@@ -29,7 +29,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         self.backend = DynamoDBPartiQLBackend(self.cursor_under_test)
         self.mock_model = MagicMock(spec=Model)
-        self.mock_model.table_name = "my_test_table"
+        self.mock_model.get_table_name = MagicMock(return_value="my_test_table")
         self.mock_model.id_column_name = "id"
 
         self.mock_model.schema = MagicMock()
@@ -294,7 +294,9 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         results = list(self.backend.records(config, self.mock_model))
 
-        expected_call_kwargs = {"Statement": expected_statement, "Parameters": []}
+        expected_call_kwargs = {
+            "Statement": expected_statement,
+        }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
             **expected_call_kwargs
         )
@@ -324,7 +326,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         expected_call_kwargs = {
             "Statement": expected_statement,
-            "Parameters": [],
             "Limit": 1,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -366,7 +367,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         expected_call_kwargs1 = {
             "Statement": expected_statement,
-            "Parameters": [],
             "NextToken": initial_ddb_token,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -397,7 +397,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         )
         expected_call_kwargs2 = {
             "Statement": expected_statement,
-            "Parameters": [],
             "NextToken": ddb_next_token_page1,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -420,7 +419,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
         next_page_data = {}
         results = list(self.backend.records(config, self.mock_model, next_page_data))
 
-        expected_call_kwargs = {"Statement": expected_statement, "Parameters": []}
+        expected_call_kwargs = {"Statement": expected_statement}
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
             **expected_call_kwargs
         )
@@ -451,7 +450,6 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         expected_call_kwargs = {
             "Statement": expected_statement,
-            "Parameters": [],
             "Limit": 1,
         }
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
@@ -470,8 +468,14 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
     def test_create_record(self, mock_logger_arg):
         """Test create() inserts a record and returns the input data."""
         data_to_create = {"id": "new_user_123", "name": "Jane Doe", "age": 28}
+        # Updated expected statement and parameters to match the new PartiQL format
+        expected_statement = (
+            "INSERT INTO \"my_test_table\" VALUE {'id': ?, 'name': ?, 'age': ?}"
+        )
         expected_ddb_parameters = [
-            {"id": {"S": "new_user_123"}, "name": {"S": "Jane Doe"}, "age": {"N": "28"}}
+            {"S": "new_user_123"},
+            {"S": "Jane Doe"},
+            {"N": "28"},
         ]
 
         self.mock_dynamodb_client.execute_statement.return_value = {}
@@ -480,7 +484,7 @@ class TestDynamoDBPartiQLBackend(unittest.TestCase):
 
         self.assertEqual(created_data, data_to_create)
         self.mock_dynamodb_client.execute_statement.assert_called_once_with(
-            Statement='INSERT INTO "my_test_table" VALUE ?',
+            Statement=expected_statement,
             Parameters=expected_ddb_parameters,
         )
 

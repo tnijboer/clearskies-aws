@@ -2,7 +2,8 @@ import base64
 import binascii
 import json
 import logging
-from decimal import Decimal
+import re
+from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 from boto3.session import Session as Boto3Session
@@ -68,8 +69,13 @@ class DynamoDBPartiQLCursor:
         """
         try:
             call_args: ExecuteStatementInputTypeDef = {"Statement": statement}
-            if parameters is not None:
+            print(statement)
+            # Only include 'Parameters' if it's not None AND not empty
+            if (
+                parameters
+            ):  # This implies parameters is not None and parameters is not an empty list
                 call_args["Parameters"] = parameters
+                print(parameters)
             if Limit is not None:
                 call_args["Limit"] = Limit
             if NextToken is not None:
@@ -81,7 +87,7 @@ class DynamoDBPartiQLCursor:
                 **call_args
             )
         except ClientError as err:
-            error_response: Dict[str, Any] = err.response.get("Error", {})
+            error_response: Dict[str, Any] = err.response.get("Error", {})  # type: ignore
             error_code: str = error_response.get("Code", "UnknownCode")
             error_message: str = error_response.get("Message", "Unknown error")
 
@@ -114,6 +120,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
     The count() method uses native DynamoDB Query/Scan operations for accuracy.
     """
 
+    _cursor: DynamoDBPartiQLCursor
     _allowed_configs: List[str] = [
         "table_name",
         "wheres",
@@ -165,7 +172,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if not table_name:
             return ""
         esc: str = self._table_escape_character()
-        final_name = f"{esc}{table_name.strip(esc)}{esc}"
+        final_name = f"{esc}{str(table_name).strip(esc)}{esc}"
         if index_name:
             final_name += f".{esc}{index_name.strip(esc)}{esc}"
         return final_name
@@ -363,8 +370,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
     ) -> Dict[str, Any]:
         """
         Converts a list of 'where' condition dictionaries into DynamoDB native
-        expression strings and attribute maps.
-        This is a simplified implementation.
+        expression strings and attribute maps for Query/Scan operations.
+        This implementation is more comprehensive than the previous one.
         """
         expression_attribute_names: Dict[str, str] = {}
         expression_attribute_values: Dict[str, AttributeValueTypeDef] = {}
@@ -374,65 +381,98 @@ class DynamoDBPartiQLBackend(CursorBackend):
         name_counter = 0
         value_counter = 0
 
-        partition_key_condition_found = False
+        # Helper to get unique placeholder names
+        def get_name_placeholder(column_name: str) -> str:
+            nonlocal name_counter
+            # Sanitize column name for placeholder if it contains special characters
+            sanitized_column_name = re.sub(r"[^a-zA-Z0-9_]", "", column_name)
+            placeholder = f"#{sanitized_column_name}_{name_counter}"
+            expression_attribute_names[placeholder] = column_name
+            name_counter += 1
+            return placeholder
+
+        # Helper to get unique value placeholders and add values
+        def get_value_placeholder(value: Any) -> str:
+            nonlocal value_counter
+            placeholder = f":val{value_counter}"
+            expression_attribute_values[placeholder] = (
+                self.condition_parser.to_dynamodb_attribute_value(value)
+            )
+            value_counter += 1
+            return placeholder
+
+        processed_condition_indices = set()
+
+        # First, try to build KeyConditionExpression for Partition Key and Sort Key
+        # Find partition key equality condition
+        pk_condition_index = -1
         if partition_key_name:
-            processed_indices = set()  # To avoid processing a condition twice
             for i, cond in enumerate(conditions):
-                if i in processed_indices:
-                    continue
                 if (
                     cond.get("column") == partition_key_name
                     and cond.get("operator") == "="
                     and cond.get("values")
                 ):
-                    name_placeholder = f"#pk{name_counter}"
-                    value_placeholder = f":pk_val{value_counter}"
-                    expression_attribute_names[name_placeholder] = partition_key_name
-                    expression_attribute_values[value_placeholder] = (
-                        self.condition_parser.to_dynamodb_attribute_value(
-                            cond["values"][0]
-                        )
-                    )
-                    key_condition_parts.append(
-                        f"{name_placeholder} = {value_placeholder}"
-                    )
-                    name_counter += 1
-                    value_counter += 1
-                    partition_key_condition_found = True
-                    processed_indices.add(i)
+                    pk_condition_index = i
                     break
 
-            # Example for sort key condition (simplified)
-            if (
-                sort_key_name and partition_key_condition_found
-            ):  # Sort key only relevant if PK is there
+        if pk_condition_index != -1:
+            pk_cond = conditions[pk_condition_index]
+            pk_name_ph = get_name_placeholder(pk_cond["column"])
+            pk_value_ph = get_value_placeholder(pk_cond["values"][0])
+            key_condition_parts.append(f"{pk_name_ph} = {pk_value_ph}")
+            processed_condition_indices.add(pk_condition_index)
+
+            # If partition key found, check for sort key condition
+            if sort_key_name:
                 for i, cond in enumerate(conditions):
-                    if i in processed_indices:
+                    if i in processed_condition_indices:
                         continue
                     if cond.get("column") == sort_key_name and cond.get("values"):
-                        # Simplified: only handle '=' for sort key for now
-                        if cond.get("operator") == "=":
-                            name_placeholder = f"#sk{name_counter}"
-                            value_placeholder = f":sk_val{value_counter}"
-                            expression_attribute_names[name_placeholder] = sort_key_name
-                            expression_attribute_values[value_placeholder] = (
-                                self.condition_parser.to_dynamodb_attribute_value(
-                                    cond["values"][0]
-                                )
-                            )
-                            key_condition_parts.append(
-                                f"{name_placeholder} = {value_placeholder}"
-                            )
-                            name_counter += 1
-                            value_counter += 1
-                            processed_indices.add(i)
-                            break  # Assuming one sort key condition for KeyConditionExpression
+                        op_lower = cond["operator"].lower()
+                        sk_name_ph = get_name_placeholder(cond["column"])
 
-        # Remaining conditions go to FilterExpression
+                        if op_lower == "=":
+                            sk_value_ph = get_value_placeholder(cond["values"][0])
+                            key_condition_parts.append(f"{sk_name_ph} = {sk_value_ph}")
+                        elif op_lower == ">":
+                            sk_value_ph = get_value_placeholder(cond["values"][0])
+                            key_condition_parts.append(f"{sk_name_ph} > {sk_value_ph}")
+                        elif op_lower == "<":
+                            sk_value_ph = get_value_placeholder(cond["values"][0])
+                            key_condition_parts.append(f"{sk_name_ph} < {sk_value_ph}")
+                        elif op_lower == ">=":
+                            sk_value_ph = get_value_placeholder(cond["values"][0])
+                            key_condition_parts.append(f"{sk_name_ph} >= {sk_value_ph}")
+                        elif op_lower == "<=":
+                            sk_value_ph = get_value_placeholder(cond["values"][0])
+                            key_condition_parts.append(f"{sk_name_ph} <= {sk_value_ph}")
+                        elif op_lower == "between":
+                            if len(cond["values"]) == 2:
+                                sk_value1_ph = get_value_placeholder(cond["values"][0])
+                                sk_value2_ph = get_value_placeholder(cond["values"][1])
+                                key_condition_parts.append(
+                                    f"{sk_name_ph} BETWEEN {sk_value1_ph} AND {sk_value2_ph}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"Skipping malformed BETWEEN condition for sort key: {cond}"
+                                )
+                        elif op_lower == "begins_with":
+                            sk_value_ph = get_value_placeholder(cond["values"][0])
+                            key_condition_parts.append(
+                                f"begins_with({sk_name_ph}, {sk_value_ph})"
+                            )
+                        else:
+                            # Other operators for sort key are not part of KeyConditionExpression
+                            # They will be handled in FilterExpression below
+                            continue
+                        processed_condition_indices.add(i)
+                        break  # Assume only one sort key condition for KeyConditionExpression
+
+        # Process all remaining conditions for FilterExpression
         for i, cond in enumerate(conditions):
-            if i in (
-                locals().get("processed_indices") or set()
-            ):  # Check if already processed for KeyCondition
+            if i in processed_condition_indices:
                 continue
 
             col_name = cond.get("column")
@@ -442,31 +482,88 @@ class DynamoDBPartiQLBackend(CursorBackend):
             if not col_name or not op or vals is None:
                 continue
 
-            # This is a very simplified filter builder. A real one would handle all operators.
-            if op == "=" and vals:  # Example: only equality
-                name_placeholder = f"#fn{name_counter}"
-                value_placeholder = f":fv{value_counter}"
-                expression_attribute_names[name_placeholder] = col_name
-                expression_attribute_values[value_placeholder] = (
-                    self.condition_parser.to_dynamodb_attribute_value(vals[0])
-                )
+            name_ph = get_name_placeholder(col_name)
+            op_lower = op.lower()
+
+            if op_lower == "=":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"{name_ph} = {value_ph}")
+            elif op_lower == "!=":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"{name_ph} <> {value_ph}")
+            elif op_lower == ">":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"{name_ph} > {value_ph}")
+            elif op_lower == "<":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"{name_ph} < {value_ph}")
+            elif op_lower == ">=":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"{name_ph} >= {value_ph}")
+            elif op_lower == "<=":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"{name_ph} <= {value_ph}")
+            elif op_lower == "between":
+                if len(vals) == 2:
+                    value1_ph = get_value_placeholder(vals[0])
+                    value2_ph = get_value_placeholder(vals[1])
+                    filter_expression_parts.append(
+                        f"{name_ph} BETWEEN {value1_ph} AND {value2_ph}"
+                    )
+                else:
+                    logger.warning(f"Skipping malformed BETWEEN condition: {cond}")
+            elif op_lower == "in":
+                value_placeholders = ", ".join([get_value_placeholder(v) for v in vals])
+                filter_expression_parts.append(f"{name_ph} IN ({value_placeholders})")
+            elif op_lower == "contains":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"contains({name_ph}, {value_ph})")
+            elif op_lower == "not contains":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"NOT contains({name_ph}, {value_ph})")
+            elif op_lower == "begins_with":
+                value_ph = get_value_placeholder(vals[0])
+                filter_expression_parts.append(f"begins_with({name_ph}, {value_ph})")
+            elif op_lower == "not begins_with":
+                value_ph = get_value_placeholder(vals[0])
                 filter_expression_parts.append(
-                    f"{name_placeholder} = {value_placeholder}"
+                    f"NOT begins_with({name_ph}, {value_ph})"
                 )
-                name_counter += 1
-                value_counter += 1
-            # Add more operator handling here for a complete filter expression builder
+            elif op_lower == "is null":
+                filter_expression_parts.append(f"attribute_not_exists({name_ph})")
+            elif op_lower == "is not null":
+                filter_expression_parts.append(f"attribute_exists({name_ph})")
+            elif (
+                op_lower == "like"
+            ):  # Clearskies 'like' usually translates to begins_with or contains
+                # This is a simplification. A full implementation might need to inspect '%' position.
+                # For now, if it contains '%', assume 'contains'. If it ends with '%', assume 'begins_with'.
+                # If no '%', it's an equality.
+                if len(vals) > 0 and isinstance(vals[0], str):
+                    like_value = vals[0]
+                    if like_value.startswith("%") and like_value.endswith("%"):
+                        value_ph = get_value_placeholder(like_value.strip("%"))
+                        filter_expression_parts.append(
+                            f"contains({name_ph}, {value_ph})"
+                        )
+                    elif like_value.endswith("%"):
+                        value_ph = get_value_placeholder(like_value.rstrip("%"))
+                        filter_expression_parts.append(
+                            f"begins_with({name_ph}, {value_ph})"
+                        )
+                    else:  # Treat as equality if no wildcards or complex pattern
+                        value_ph = get_value_placeholder(like_value)
+                        filter_expression_parts.append(f"{name_ph} = {value_ph}")
+                else:
+                    logger.warning(f"Skipping unsupported LIKE condition: {cond}")
+            else:
+                logger.warning(
+                    f"Skipping unsupported operator '{op}' for native DynamoDB expressions: {cond}"
+                )
 
         result: Dict[str, Any] = {}
-        if (
-            key_condition_parts and partition_key_condition_found
-        ):  # Only add KeyConditionExpression if PK equality was found
+        if key_condition_parts:
             result["KeyConditionExpression"] = " AND ".join(key_condition_parts)
-        elif (
-            key_condition_parts
-        ):  # If we built key_condition_parts but PK equality wasn't the one, move to filter
-            filter_expression_parts.extend(key_condition_parts)
-
         if filter_expression_parts:
             result["FilterExpression"] = " AND ".join(filter_expression_parts)
         if expression_attribute_names:
@@ -495,8 +592,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
                 table_description.get("GlobalSecondaryIndexes", [])
             )
             for gsi in gsi_definitions:
-                if gsi["IndexName"] == chosen_index_name:
-                    for key_element in gsi["KeySchema"]:
+                if gsi.get("IndexName", "") == chosen_index_name:
+                    for key_element in gsi.get("KeySchema", []):
                         if key_element["KeyType"] == "RANGE":
                             sort_key_for_target = key_element["AttributeName"]
                             break
@@ -516,7 +613,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
             wheres_config, partition_key_for_target, sort_key_for_target
         )
 
-        params_for_native_call: Dict[str, Any] = {  # Renamed from params
+        params_for_native_call: Dict[str, Any] = {
             "TableName": table_name,
             "Select": "COUNT",
         }
@@ -524,36 +621,37 @@ class DynamoDBPartiQLBackend(CursorBackend):
             params_for_native_call["IndexName"] = chosen_index_name
 
         can_use_query_for_count = False
+        # A Query operation can be used for count if there is a KeyConditionExpression
+        # that includes an equality condition on the partition key of the target (table or GSI).
+        # We check if the partition key condition was successfully extracted into KeyConditionExpression.
         if (
-            native_expressions.get("KeyConditionExpression")
-            and partition_key_for_target
-            and any(
-                w.get("column") == partition_key_for_target and w.get("operator") == "="
-                for w in wheres_config
-                if isinstance(w, dict)
-            )
+            partition_key_for_target
+            and f"#{re.sub(r'[^a-zA-Z0-9_]', '', partition_key_for_target)}_0"
+            in native_expressions.get("ExpressionAttributeNames", {})
+            and native_expressions.get("KeyConditionExpression")
+            and f"#{re.sub(r'[^a-zA-Z0-9_]', '', partition_key_for_target)}_0 = :val0"
+            in native_expressions[
+                "KeyConditionExpression"
+            ]  # Simplified check, assumes first value is PK
         ):
             can_use_query_for_count = True
             params_for_native_call["KeyConditionExpression"] = native_expressions[
                 "KeyConditionExpression"
             ]
-            if native_expressions.get(
-                "FilterExpression"
-            ):  # Query can also have FilterExpression
+            if native_expressions.get("FilterExpression"):
                 params_for_native_call["FilterExpression"] = native_expressions[
                     "FilterExpression"
                 ]
-        else:  # Fall back to Scan
-            # If KeyConditionExpression was built but not for the PK, it becomes part of Filter for Scan
-            all_filter_parts = []
-            if native_expressions.get("KeyConditionExpression"):
-                all_filter_parts.append(native_expressions["KeyConditionExpression"])
+        else:
+            # Fall back to Scan, and all conditions (including any potential key conditions that
+            # couldn't be used for a Query) go into FilterExpression.
             if native_expressions.get("FilterExpression"):
-                all_filter_parts.append(native_expressions["FilterExpression"])
-            if all_filter_parts:
-                params_for_native_call["FilterExpression"] = " AND ".join(
-                    all_filter_parts
-                )
+                params_for_native_call["FilterExpression"] = native_expressions[
+                    "FilterExpression"
+                ]
+            # If there's a KeyConditionExpression but no PK equality, it should also be part of the filter for scan.
+            # This logic is now handled more robustly within _wheres_to_native_dynamo_expressions
+            # by ensuring only true PK/SK conditions go to KeyConditionExpression initially.
 
         if native_expressions.get("ExpressionAttributeNames"):
             params_for_native_call["ExpressionAttributeNames"] = native_expressions[
@@ -599,18 +697,31 @@ class DynamoDBPartiQLBackend(CursorBackend):
         """
         Creates a new record in DynamoDB using PartiQL INSERT.
         """
-        table_name: str = self._finalize_table_name(model.table_name)  # type: ignore
+        table_name: str = self._finalize_table_name(model.get_table_name())
 
-        item_to_insert: Dict[str, AttributeValueTypeDef] = {
-            key: self.condition_parser.to_dynamodb_attribute_value(value)
-            for key, value in data.items()
-        }
+        if not data:
+            logger.warning("Create called with empty data. Nothing to insert.")
+            return {}
 
-        parameters: List[AttributeValueTypeDef] = [item_to_insert]  # type: ignore
-        statement = f"INSERT INTO {table_name} VALUE ?"
+        # Prepare parameters
+        parameters: List[AttributeValueTypeDef] = []
+
+        # Build the 'VALUE {key: ?, key: ?}' part and collect parameters
+        value_struct_parts: List[str] = []
+        for key, value in data.items():
+            # Use single quotes around the key to match PartiQL documentation examples
+            value_struct_parts.append(f"'{key}': ?")
+            parameters.append(self.condition_parser.to_dynamodb_attribute_value(value))
+        value_struct_clause = ", ".join(value_struct_parts)
+
+        # Construct the INSERT statement with explicit struct format
+        statement = f"INSERT INTO {table_name} VALUE {{{value_struct_clause}}}"
 
         try:
-            self._cursor.execute(statement=statement, parameters=parameters)
+            self._cursor.execute(
+                statement=statement,
+                parameters=parameters,
+            )
             return data
         except Exception as e:
             logger.error(
@@ -624,8 +735,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
         """
         Updates an existing record in DynamoDB using PartiQL UPDATE.
         """
-        table_name: str = self._finalize_table_name(model.table_name)  # type: ignore
-        id_column_name: str = model.id_column_name  # type: ignore
+        table_name: str = self._finalize_table_name(model.get_table_name())
+        id_column_name: str = model.id_column_name
         escaped_id_column: str = (
             f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
         )
@@ -679,13 +790,15 @@ class DynamoDBPartiQLBackend(CursorBackend):
         """
         Deletes a record from DynamoDB using PartiQL DELETE.
         """
-        table_name: str = self._finalize_table_name(model.table_name)  # type: ignore
-        id_column_name: str = model.id_column_name  # type: ignore
+        table_name: str = self._finalize_table_name(model.get_table_name())
+        id_column_name: str = model.id_column_name
         escaped_id_column: str = (
             f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
         )
 
-        parameters: List[AttributeValueTypeDef] = [self.condition_parser.to_dynamodb_attribute_value(id_value)]  # type: ignore
+        parameters: List[AttributeValueTypeDef] = [
+            self.condition_parser.to_dynamodb_attribute_value(id_value)
+        ]
         statement: str = f"DELETE FROM {table_name} WHERE {escaped_id_column} = ?"
 
         try:
@@ -731,7 +844,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if "N" in attribute_value:
             try:
                 return Decimal(attribute_value["N"])
-            except DecimalException:
+            except InvalidOperation:  # Changed from DecimalException
                 logger.warning(
                     f"Could not convert N value '{attribute_value['N']}' to Decimal."
                 )
@@ -741,7 +854,13 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if "NULL" in attribute_value:
             return None
         if "B" in attribute_value:
-            return base64.b64decode(attribute_value["B"])
+            try:
+                return base64.b64decode(attribute_value["B"])
+            except (binascii.Error, TypeError) as e:
+                logger.warning(
+                    f"Failed to decode base64 binary value: {attribute_value['B']}, error: {e}"
+                )
+                return attribute_value["B"]  # Return raw if decoding fails
         if "L" in attribute_value:
             return [self._map_from_boto3_value(item) for item in attribute_value["L"]]
         if "M" in attribute_value:
@@ -754,13 +873,19 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if "NS" in attribute_value:
             try:
                 return set(Decimal(n_val) for n_val in attribute_value["NS"])
-            except DecimalException:
+            except InvalidOperation:  # Changed from DecimalException
                 logger.warning(
                     f"Could not convert one or more NS values in '{attribute_value['NS']}' to Decimal."
                 )
                 return set(attribute_value["NS"])
         if "BS" in attribute_value:
-            return set(base64.b64decode(b_val) for b_val in attribute_value["BS"])
+            try:
+                return set(base64.b64decode(b_val) for b_val in attribute_value["BS"])
+            except (binascii.Error, TypeError) as e:
+                logger.warning(
+                    f"Failed to decode one or more base64 binary values in '{attribute_value['BS']}', error: {e}"
+                )
+                return set(attribute_value["BS"])  # Return raw if decoding fails
 
         logger.warning(f"Unrecognized DynamoDB attribute type: {attribute_value}")
         return attribute_value
