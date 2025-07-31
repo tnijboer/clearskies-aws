@@ -13,7 +13,9 @@ class WebSocketConnectionModel(clearskies.Model):
 
     boto3 = clearskies_aws.di.inject.Boto3()
     backend = clearskies_aws.backends.DummyBackend()
-    input_output = clearskies.di.inject.ByName("input_output")
+    input_output = clearskies.di.inject.ByClass(
+        clearskies_aws.input_outputs.LambdaAPIGatewayWebSocket
+    )
 
     def send(self, message):
         if not self:
