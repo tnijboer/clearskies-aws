@@ -1,6 +1,6 @@
 import base64
 import json
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union, cast
 from urllib.parse import urlencode
 
 from aws_lambda_powertools.utilities.parser import parse
@@ -10,6 +10,7 @@ from aws_lambda_powertools.utilities.parser.models import (
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from clearskies.input_outputs.input_output import InputOutput
 from pydantic import ValidationError
+from pydantic.networks import IPvAnyNetwork
 
 
 class LambdaAPIGateway(InputOutput):
@@ -18,8 +19,8 @@ class LambdaAPIGateway(InputOutput):
     _request_headers: dict[str, str]
     _request_method: Literal["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     _resource = None
-    _query_parameters: Optional[dict[str, Union[str, list[str]]]] = None
-    _path_parameters: Optional[dict[str, str]] = None
+    _query_parameters: dict[str, Union[str, list[str]]] = {}
+    _path_parameters: dict[str, str] = {}
     _cached_body = None
     _body_was_cached = False
 
@@ -38,13 +39,15 @@ class LambdaAPIGateway(InputOutput):
             **(self._event.queryStringParameters or {}),
             **(self._event.multiValueQueryStringParameters or {}),
         }
-        self._path_parameters = self._event.pathParameters
+        self._path_parameters = (
+            self._event.pathParameters if self._event.pathParameters else {}
+        )
         self._request_headers = {}
         for key, value in {
             **self._event.headers,
             **self._event.multiValueHeaders,
         }.items():
-            self._request_headers[key.lower()] = value
+            self._request_headers[key.lower()] = str(value)
 
     def respond(self, body: Any, status_code: int = 200) -> dict[str, Any]:
         if "content-type" not in self.response_headers:
@@ -67,10 +70,10 @@ class LambdaAPIGateway(InputOutput):
             "body": final_body,
         }
 
-    def has_body(self):
+    def has_body(self) -> bool:
         return bool(self.get_body())
 
-    def get_body(self):
+    def get_body(self) -> Any:
         if not self._body_was_cached:
             self._cached_body = self._event.body
             if (
@@ -95,23 +98,25 @@ class LambdaAPIGateway(InputOutput):
     def get_query_string(self) -> str:
         return urlencode(self._query_parameters) if self._query_parameters else ""
 
-    def get_content_type(self):
-        return self.get_request_header("content-type", True)
+    def get_content_type(self) -> str:
+        return str(self.get_request_header("content-type", True))
 
-    def get_protocol(self):
+    def get_protocol(self) -> str:
         return "https"
 
-    def has_request_header(self, header_name):
+    def has_request_header(self, header_name: str) -> bool:
         return header_name.lower() in self._request_headers
 
-    def get_request_header(self, header_name, silent=False):
+    def get_request_header(
+        self, header_name: str, silent: bool = False
+    ) -> Union[list[str], str]:
         if header_name.lower() not in self._request_headers:
             if not silent:
                 raise KeyError(f"HTTP header '{header_name}' was not found in request")
             return ""
         return self._request_headers[header_name.lower()]
 
-    def get_query_parameter(self, key) -> list[str]:
+    def get_query_parameter(self, key: str) -> list[str]:
         if not self._query_parameters or key not in self._query_parameters:
             return []
 
@@ -121,21 +126,23 @@ class LambdaAPIGateway(InputOutput):
             return [value]
         return value
 
-    def get_query_parameters(self):
+    def get_query_parameters(self) -> dict[str, Union[str, list[str]]]:
         return self._query_parameters
 
-    def context_specifics(self):
+    def context_specifics(self) -> dict[str, Any]:
         return {
             "event": self._event,
             "context": self._context,
         }
 
-    def get_client_ip(self):
+    def get_client_ip(self) -> IPvAnyNetwork:
         # I haven't actually tested with an API gateway yet to figure out which of these works...
         if hasattr(self._event, "requestContext") and hasattr(
             self._event.requestContext, "identity"
         ):
             if hasattr(self._event.requestContext.identity, "sourceIp"):
-                return self._event.requestContext.identity.sourceIp
+                return cast(IPvAnyNetwork, self._event.requestContext.identity.sourceIp)
 
-        return self.get_request_header("x-forwarded-for", silent=True)
+        return cast(
+            IPvAnyNetwork, self.get_request_header("x-forwarded-for", silent=True)
+        )
