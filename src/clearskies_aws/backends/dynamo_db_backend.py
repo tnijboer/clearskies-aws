@@ -3,13 +3,16 @@ import json
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Tuple
 
+import clearskies
 from boto3.dynamodb import conditions as dynamodb_conditions
 from clearskies import model
 from clearskies.autodoc.schema import String as AutoDocString
 from clearskies.backends.backend import Backend
-from clearskies.column_types.boolean import Boolean
-from clearskies.column_types.float import Float
-from clearskies.column_types.integer import Integer
+from clearskies.columns.boolean import Boolean
+from clearskies.columns.float import Float
+from clearskies.columns.integer import Integer
+
+import clearskies_aws
 
 
 class DynamoDBBackend(Backend):
@@ -70,8 +73,10 @@ class DynamoDBBackend(Backend):
     Any other filter/sort options will become unreliable as soon as the table grows past the maximum result size.
     """
 
-    _boto3 = None
-    _environment = None
+    boto3 = clearskies_aws.di.inject.Boto3()
+
+    environment = clearskies.di.inject.Environment()
+
     _dynamodb = None
 
     _allowed_configs = [
@@ -116,18 +121,20 @@ class DynamoDBBackend(Backend):
         'LIKE': '',    # requires special handling
     }
 
-    def __init__(self, boto3, environment):
-        self._boto3 = boto3
-        self._environment = environment
-        if not environment.get('AWS_REGION', True):
+    def __init__(self):
+        if not self.environment.get("AWS_REGION", True):
             raise ValueError('To use DynamoDB you must use set AWS_REGION in the .env file or an environment variable')
 
-        self._dynamodb = self._boto3.resource('dynamodb', region_name=environment.get('AWS_REGION', True))
+        self._dynamodb = self.boto3.resource(
+            "dynamodb", region_name=self.environment.get("AWS_REGION", True)
+        )
         self._table_indexes = {}
         self._model_columns_cache = {}
 
-    def configure(self):
-        pass
+    @classmethod
+    def clear_table_cache(cls):
+        cls._table_indexes = {}
+        cls._model_columns_cache = {}
 
     def update(self, id, data, model):
         # when we run an update column we must include the sort column on the primary
@@ -535,7 +542,7 @@ class DynamoDBBackend(Backend):
                 raise KeyError(f'Missing required configuration key {key}')
 
         for key in self._allowed_configs:
-            if not key in configuration:
+            if key not in configuration:
                 configuration[key] = [] if key[-1] == 's' else ''
 
         return configuration

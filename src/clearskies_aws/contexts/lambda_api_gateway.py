@@ -1,7 +1,10 @@
-from ..input_outputs import LambdaAPIGateway as LambdaAPIGatewayInputOutput
-from ..di import StandardDependencies
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
+
+from ..di import StandardDependencies
+from ..input_outputs import LambdaAPIGateway as LambdaAPIGatewayInputOutput
+
+
 class LambdaAPIGateway(Context):
     def __init__(self, di):
         super().__init__(di)

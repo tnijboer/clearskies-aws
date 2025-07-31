@@ -1,19 +1,20 @@
 import datetime
+import logging
 from types import ModuleType
 from typing import Any, Callable
 
 import clearskies
-from clearskies.contexts.wsgi import Wsgi as WsgiDependency
+from clearskies.contexts.context import Context as CoreContext
 from clearskies.di.additional_config import AdditionalConfig
 
 import clearskies_aws
 
 
-class Wsgi(WsgiDependency):
+class Context(CoreContext):
     """
-    Connect your application to a WSGI server.
+    Context: a flexible way to connect applications to hosting strategies.
 
-    Extend from the core WSGI context,
+    Extend from the core context,
     but with an override of the DI to use clearskies_aws.di.Di().
     """
 
@@ -44,3 +45,4 @@ class Wsgi(WsgiDependency):
             utcnow=utcnow,
         )
         self.application = application
+        self.logger = logging.getLogger(__class__.__name__)

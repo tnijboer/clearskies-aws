@@ -1,7 +1,12 @@
-from ..input_outputs import LambdaAPIGatewayWebSocket as LambdaAPIGatewayWebSocketInputOutput
-from ..di import StandardDependencies
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
+
+from ..di import StandardDependencies
+from ..input_outputs import (
+    LambdaAPIGatewayWebSocket as LambdaAPIGatewayWebSocketInputOutput,
+)
+
+
 class LambdaAPIGatewayWebSocket(Context):
     def __init__(self, di):
         super().__init__(di)
@@ -11,6 +16,8 @@ class LambdaAPIGatewayWebSocket(Context):
             raise ValueError("Cannot execute LambdaAPIGatewayWebSocket context without first configuring it")
 
         return self.handler(LambdaAPIGatewayWebSocketInputOutput(event, context))
+
+
 def lambda_api_gateway_web_socket(
     application,
     di_class=StandardDependencies,

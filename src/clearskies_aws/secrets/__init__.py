@@ -1,7 +1,11 @@
-from clearskies import BindingConfig
-from .parameter_store import ParameterStore
-from .secrets_manager import SecretsManager
-from .akeyless_with_ssm_cache import AkeylessWithSsmCache
-from . import additional_configs
-def akeyless_with_ssm_cache(*args, **kwargs):
-    return BindingConfig(AkeylessWithSsmCache, *args, **kwargs)
+from clearskies_aws.secrets import additional_configs
+from clearskies_aws.secrets.akeyless_with_ssm_cache import AkeylessWithSsmCache
+from clearskies_aws.secrets.parameter_store import ParameterStore
+from clearskies_aws.secrets.secrets_manager import SecretsManager
+
+__all__ = [
+    "ParameterStore",
+    "SecretsManager",
+    "AkeylessWithSsmCache",
+    "additional_configs",
+]
