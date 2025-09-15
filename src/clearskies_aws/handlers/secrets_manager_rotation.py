@@ -1,9 +1,10 @@
 import json
 
-import clearskies
-from clearskies.handlers.exceptions import ClientError
-from clearskies.handlers.base import Base
 import botocore
+import clearskies
+from clearskies.handlers.base import Base
+from clearskies.handlers.exceptions import ClientError
+
 
 class SecretsManagerRotation(Base, clearskies.handlers.SchemaHelper):
     _steps = ["createSecret", "setSecret", "testSecret", "finishSecret"]
@@ -34,23 +35,25 @@ class SecretsManagerRotation(Base, clearskies.handlers.SchemaHelper):
             if config is None:
                 continue
             if not callable(config):
-                raise ValueError(f"Misconfiguration for handler {class_name}: configuration '{config_name}' is not callable")
+                raise ValueError(
+                    f"Misconfiguration for handler {class_name}: configuration '{config_name}' is not callable"
+                )
 
         if configuration.get("schema") is not None:
             self._check_schema(configuration["schema"], None, f"Misconfiguration for handler {class_name}")
 
     def _finalize_configuration(self, configuration):
-        if configuration.get('schema'):
-            configuration['schema'] = self._schema_to_columns(configuration['schema'])
+        if configuration.get("schema"):
+            configuration["schema"] = self._schema_to_columns(configuration["schema"])
         return super()._finalize_configuration(configuration)
 
     def handle(self, input_output):
         request_data = input_output.json_body()
 
-        arn = request_data.get('SecretId')
-        request_token = request_data.get('ClientRequestToken')
-        step = request_data.get('Step')
-        secretsmanager = self.boto3.client('secretsmanager')
+        arn = request_data.get("SecretId")
+        request_token = request_data.get("ClientRequestToken")
+        step = request_data.get("Step")
+        secretsmanager = self.boto3.client("secretsmanager")
         metadata = secretsmanager.describe_secret(SecretId=arn)
 
         self._validate_secret_and_request(step, arn, metadata, request_token)
@@ -59,7 +62,7 @@ class SecretsManagerRotation(Base, clearskies.handlers.SchemaHelper):
         pending_secret_data = {}
 
         current_secret = secretsmanager.get_secret_value(SecretId=arn, VersionStage=self.current)
-        current_secret_data = json.loads(current_secret['SecretString'])
+        current_secret_data = json.loads(current_secret["SecretString"])
 
         # validate the current secret
         secret_errors = {
@@ -72,10 +75,12 @@ class SecretsManagerRotation(Base, clearskies.handlers.SchemaHelper):
         # check for a pending secret.  Note that this is not always available.  In the event that we are retrying a failed
         # rotation it will already be set, in which case we need to skip the createSecret step.
         try:
-            pending_secret = secretsmanager.get_secret_value(SecretId=arn, VersionId=request_token, VersionStage=self.pending)
-            pending_secret_data = json.loads(pending_secret['SecretString'])
+            pending_secret = secretsmanager.get_secret_value(
+                SecretId=arn, VersionId=request_token, VersionStage=self.pending
+            )
+            pending_secret_data = json.loads(pending_secret["SecretString"])
         except botocore.exceptions.ClientError as error:
-            if error.response['Error']['Code'] == 'ResourceNotFoundException':
+            if error.response["Error"]["Code"] == "ResourceNotFoundException":
                 pending_secret_data = None
             else:
                 raise error
@@ -95,11 +100,11 @@ class SecretsManagerRotation(Base, clearskies.handlers.SchemaHelper):
         )
 
     def _validate_secret_and_request(self, step, arn, metadata, request_token):
-        """ This function does some basic checks suggested by AWS of both the request and the secret to make sure everything is on the up-and-up. """
+        """Perform basic checks suggested by AWS of both the request and the secret to ensure validity."""
         if step not in self._steps:
             raise ClientError(f"Invalid step: {step}")
 
-        if not metadata.get('RotationEnabled'):
+        if not metadata.get("RotationEnabled"):
             raise ValueError("Secret %s is not enabled for rotation" % arn)
 
         versions = metadata["VersionIdsToStages"]
@@ -107,23 +112,31 @@ class SecretsManagerRotation(Base, clearskies.handlers.SchemaHelper):
         if request_token not in versions:
             raise ValueError(f"{prefix} we don't have a stage for rotation")
         if self.current in versions[request_token]:
-            raise ValueError(f"{prefix} it's already the current version, which shouldn't happen.  I'm quitting with prejudice.")
+            raise ValueError(
+                f"{prefix} it's already the current version, which shouldn't happen.  I'm quitting with prejudice."
+            )
         elif self.pending not in versions[request_token]:
             raise ValueError(f"{prefix} it hasn't been set to pending yet, which makes no sense!")
 
     def createSecret(self, **kwargs):
         new_secret_data = self._di.call_function(self._configuration["createSecret"], **kwargs)
         if new_secret_data is None:
-            raise ValueError(f"I called the configured createSecret function but it didn't return anything.  It has to return the new secret data.")
+            raise ValueError(
+                f"I called the configured createSecret function but it didn't return anything.  It has to return the new secret data."
+            )
         if not isinstance(new_secret_data, dict):
-            raise ValueError(f"I called the configured createSecret function but it didn't return a dictionary.  The createSecret function must return a dictionary.")
+            raise ValueError(
+                f"I called the configured createSecret function but it didn't return a dictionary.  The createSecret function must return a dictionary."
+            )
 
         secret_errors = {
             **self._extra_column_errors(new_secret_data),
             **self._find_input_errors(new_secret_data),
         }
         if secret_errors:
-            raise ValueError(f"The secret data returned by the call to createSecret did not match the configured schema: {secret_errors}")
+            raise ValueError(
+                f"The secret data returned by the call to createSecret did not match the configured schema: {secret_errors}"
+            )
 
         # if we get this far we can store the new data
         secretsmanager = kwargs["secretsmanager"]
@@ -167,8 +180,5 @@ class SecretsManagerRotation(Base, clearskies.handlers.SchemaHelper):
 
         # finish the rotation by taking the new version and making it current.
         secretsmanager.update_secret_version_stage(
-            SecretId=arn,
-            VersionStage=self.current,
-            MoveToVersionId=request_token,
-            RemoveFromVersionId=current_version
+            SecretId=arn, VersionStage=self.current, MoveToVersionId=request_token, RemoveFromVersionId=current_version
         )

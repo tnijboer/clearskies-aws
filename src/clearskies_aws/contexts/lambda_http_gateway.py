@@ -1,7 +1,10 @@
-from ..input_outputs import LambdaHTTPGateway as LambdaHTTPGatewayInputOutput
-from ..di import StandardDependencies
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
+
+from ..di import StandardDependencies
+from ..input_outputs import LambdaHTTPGateway as LambdaHTTPGatewayInputOutput
+
+
 class LambdaHTTPGateway(Context):
     def __init__(self, di):
         super().__init__(di)
@@ -11,6 +14,8 @@ class LambdaHTTPGateway(Context):
             raise ValueError("Cannot execute LambdaHTTPGateway context without first configuring it")
 
         return self.handler(LambdaHTTPGatewayInputOutput(event, context))
+
+
 def lambda_http_gateway(
     application,
     di_class=StandardDependencies,

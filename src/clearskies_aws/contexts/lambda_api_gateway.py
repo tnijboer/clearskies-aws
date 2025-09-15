@@ -14,6 +14,8 @@ class LambdaAPIGateway(Context):
             raise ValueError("Cannot execute LambdaAPIGateway context without first configuring it")
 
         return self.handler(LambdaAPIGatewayInputOutput(event, context))
+
+
 def lambda_api_gateway(
     application,
     di_class=StandardDependencies,

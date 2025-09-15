@@ -35,7 +35,7 @@ class DynamoDBPartiQLCursor:
 
     def __init__(self, boto3_session: Boto3Session) -> None:
         """
-        Initializes the DynamoDBPartiQLCursor.
+        Create the DynamoDBPartiQLCursor.
 
         Args:
             boto3_session: An initialized Boto3 Session object.
@@ -70,9 +70,7 @@ class DynamoDBPartiQLCursor:
         try:
             call_args: ExecuteStatementInputTypeDef = {"Statement": statement}
             # Only include 'Parameters' if it's not None AND not empty
-            if (
-                parameters
-            ):  # This implies parameters is not None and parameters is not an empty list
+            if parameters:  # This implies parameters is not None and parameters is not an empty list
                 call_args["Parameters"] = parameters
             if Limit is not None:
                 call_args["Limit"] = Limit
@@ -81,9 +79,7 @@ class DynamoDBPartiQLCursor:
             if ConsistentRead is not None:
                 call_args["ConsistentRead"] = ConsistentRead
 
-            output: ExecuteStatementOutputTypeDef = self._client.execute_statement(
-                **call_args
-            )
+            output: ExecuteStatementOutputTypeDef = self._client.execute_statement(**call_args)
         except ClientError as err:
             error_response: Dict[str, Any] = err.response.get("Error", {})  # type: ignore
             error_code: str = error_response.get("Code", "UnknownCode")
@@ -113,6 +109,7 @@ class DynamoDBPartiQLCursor:
 class DynamoDBPartiQLBackend(CursorBackend):
     """
     DynamoDB backend implementation that uses PartiQL for database interactions.
+
     Supports querying base tables and attempts to use Global Secondary Indexes (GSIs)
     when appropriate based on query conditions and sorting.
     The count() method uses native DynamoDB Query/Scan operations for accuracy.
@@ -134,17 +131,13 @@ class DynamoDBPartiQLBackend(CursorBackend):
     _required_configs: List[str] = ["table_name"]
 
     def __init__(self, dynamo_db_parti_ql_cursor: DynamoDBPartiQLCursor) -> None:
-        """
-        Initializes the DynamoDBPartiQLBackend.
-        """
+        """Initialize the DynamoDBPartiQLBackend."""
         super().__init__(dynamo_db_parti_ql_cursor)
         self.condition_parser: DynamoDBConditionParser = DynamoDBConditionParser()
         self._table_descriptions_cache: Dict[str, Dict[str, Any]] = {}
 
     def _get_table_description(self, table_name: str) -> Dict[str, Any]:
-        """
-        Retrieves and caches the DynamoDB table description.
-        """
+        """Retrieve and cache the DynamoDB table description."""
         if table_name not in self._table_descriptions_cache:
             try:
                 self._table_descriptions_cache[table_name] = self._cursor._client.describe_table(TableName=table_name)  # type: ignore
@@ -154,19 +147,15 @@ class DynamoDBPartiQLBackend(CursorBackend):
         return self._table_descriptions_cache[table_name].get("Table", {})
 
     def _table_escape_character(self) -> str:
-        """Returns the character used to escape table/index names."""
+        """Return the character used to escape table/index names."""
         return '"'
 
     def _column_escape_character(self) -> str:
-        """Returns the character used to escape column names."""
+        """Return the character used to escape column names."""
         return '"'
 
-    def _finalize_table_name(
-        self, table_name: str, index_name: Optional[str] = None
-    ) -> str:
-        """
-        Escapes a table name and optionally an index name for use in a PartiQL FROM clause.
-        """
+    def _finalize_table_name(self, table_name: str, index_name: Optional[str] = None) -> str:
+        """Escapes a table name and optionally an index name for use in a PartiQL FROM clause."""
         if not table_name:
             return ""
         esc: str = self._table_escape_character()
@@ -178,9 +167,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
     def _conditions_as_wheres_and_parameters(
         self, conditions: List[Dict[str, Any]], default_table_name: str
     ) -> Tuple[str, List[AttributeValueTypeDef]]:
-        """
-        Converts where conditions into a PartiQL WHERE clause and parameters.
-        """
+        """Convert where conditions into a PartiQL WHERE clause and parameters."""
         if not conditions:
             return "", []
 
@@ -197,9 +184,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
             values: Optional[List[Any]] = where.get("values")
 
             if not column or not operator or values is None:
-                logger.warning(
-                    f"Skipping malformed structured where condition: {where}"
-                )
+                logger.warning(f"Skipping malformed structured where condition: {where}")
                 continue
 
             value_parts: List[str] = []
@@ -220,14 +205,10 @@ class DynamoDBPartiQLBackend(CursorBackend):
             elif op_lower in self.condition_parser.operators_without_placeholders:
                 condition_string = f"{column} {operator}"
             else:
-                condition_string = (
-                    f"{column} {operator} {value_parts[0] if value_parts else ''}"
-                )
+                condition_string = f"{column} {operator} {value_parts[0] if value_parts else ''}"
 
             try:
-                parsed: Dict[str, Any] = self.condition_parser.parse_condition(
-                    condition_string
-                )
+                parsed: Dict[str, Any] = self.condition_parser.parse_condition(condition_string)
                 where_parts.append(parsed["parsed"])
                 parameters.extend(parsed["values"])
             except ValueError as e:
@@ -241,31 +222,21 @@ class DynamoDBPartiQLBackend(CursorBackend):
     def as_sql(
         self, configuration: Dict[str, Any]
     ) -> Tuple[str, List[AttributeValueTypeDef], Optional[int], Optional[str]]:
-        """
-        Constructs a PartiQL statement and parameters from a query configuration.
-        """
+        """Construct a PartiQL statement and parameters from a query configuration."""
         escape: str = self._column_escape_character()
         table_name: str = configuration.get("table_name", "")
         chosen_index_name: Optional[str] = configuration.get("_chosen_index_name")
 
-        wheres, parameters = self._conditions_as_wheres_and_parameters(
-            configuration.get("wheres", []), table_name
-        )
+        wheres, parameters = self._conditions_as_wheres_and_parameters(configuration.get("wheres", []), table_name)
 
-        from_clause_target: str = self._finalize_table_name(
-            table_name, chosen_index_name
-        )
+        from_clause_target: str = self._finalize_table_name(table_name, chosen_index_name)
 
         selects: Optional[List[str]] = configuration.get("selects")
         select_clause: str
         if selects:
-            select_clause = ", ".join(
-                [f"{escape}{s.strip(escape)}{escape}" for s in selects]
-            )
+            select_clause = ", ".join([f"{escape}{s.strip(escape)}{escape}" for s in selects])
             if configuration.get("select_all"):
-                logger.warning(
-                    "Both 'select_all=True' and specific 'selects' were provided. Using specific 'selects'."
-                )
+                logger.warning("Both 'select_all=True' and specific 'selects' were provided. Using specific 'selects'.")
         else:
             select_clause = "*"
 
@@ -276,22 +247,25 @@ class DynamoDBPartiQLBackend(CursorBackend):
             for sort in sorts:
                 column_name: str = sort["column"]
                 direction: str = sort.get("direction", "ASC").upper()
-                sort_parts.append(
-                    f"{escape}{column_name.strip(escape)}{escape} {direction}"
-                )
+                sort_parts.append(f"{escape}{column_name.strip(escape)}{escape} {direction}")
             if sort_parts:
                 order_by = " ORDER BY " + ", ".join(sort_parts)
 
         if configuration.get("group_by_column"):
+            group_by_column = configuration.get("group_by_column")
             logger.warning(
-                "Configuration included 'group_by_column=" + configuration.get("group_by_column") + "', " +
-                "but GROUP BY is not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
+                "Configuration included 'group_by_column="
+                + (group_by_column if group_by_column is not None else "")
+                + "', "
+                + "but GROUP BY is not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
             )
 
         if configuration.get("joins"):
             logger.warning(
-                "Configuration included 'joins=" + str(configuration.get("joins")) + "', " +
-                "but JOINs are not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
+                "Configuration included 'joins="
+                + str(configuration.get("joins"))
+                + "', "
+                + "but JOINs are not supported by this DynamoDB PartiQL backend and will be ignored for SQL generation."
             )
 
         limit: Optional[int] = configuration.get("limit")
@@ -306,9 +280,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         if not from_clause_target:
             raise ValueError("Table name is required for constructing SQL query.")
 
-        statement: str = (
-            f"SELECT {select_clause} FROM {from_clause_target}{wheres}{order_by}".strip()
-        )
+        statement: str = f"SELECT {select_clause} FROM {from_clause_target}{wheres}{order_by}".strip()
 
         return statement, parameters, limit, next_token
 
@@ -318,18 +290,12 @@ class DynamoDBPartiQLBackend(CursorBackend):
         model: ClearSkiesModel,
         next_page_data: dict[str, Any] = {},
     ) -> Generator[Dict[str, Any], None, None]:
-        """
-        Fetches records from DynamoDB based on the provided configuration using PartiQL.
-        """
+        """Fetch records from DynamoDB based on the provided configuration using PartiQL."""
         configuration = self._check_query_configuration(configuration, model)
 
-        statement, params, limit, client_next_token_from_as_sql = self.as_sql(
-            configuration
-        )
+        statement, params, limit, client_next_token_from_as_sql = self.as_sql(configuration)
 
-        ddb_token_for_this_call: Optional[str] = self.restore_next_token_from_config(
-            client_next_token_from_as_sql
-        )
+        ddb_token_for_this_call: Optional[str] = self.restore_next_token_from_config(client_next_token_from_as_sql)
 
         cursor_limit: Optional[int] = None
         if limit is not None and limit > 0:
@@ -343,9 +309,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
                 NextToken=ddb_token_for_this_call,
             )
         except Exception as e:
-            logger.error(
-                f"Error executing PartiQL statement in records(): {statement}, error: {e}"
-            )
+            logger.error(f"Error executing PartiQL statement in records(): {statement}, error: {e}")
             next_page_data = {}
             raise
 
@@ -356,9 +320,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
 
         next_token_from_ddb: Optional[str] = response.get("NextToken")
         if next_token_from_ddb:
-            next_page_data["next_token"] = self.serialize_next_token_for_response(
-                next_token_from_ddb
-            )
+            next_page_data["next_token"] = self.serialize_next_token_for_response(next_token_from_ddb)
 
     def _wheres_to_native_dynamo_expressions(
         self,
@@ -367,8 +329,11 @@ class DynamoDBPartiQLBackend(CursorBackend):
         sort_key_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Converts a list of 'where' condition dictionaries into DynamoDB native
-        expression strings and attribute maps for Query/Scan operations.
+        Convert 'where' conditions to DynamoDB expressions.
+
+        Transforms a list of condition dictionaries into PartiQL expression strings and attribute maps
+        for Query/Scan operations.
+
         This implementation is more comprehensive than the previous one.
         """
         expression_attribute_names: Dict[str, str] = {}
@@ -393,9 +358,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         def get_value_placeholder(value: Any) -> str:
             nonlocal value_counter
             placeholder = f":val{value_counter}"
-            expression_attribute_values[placeholder] = (
-                self.condition_parser.to_dynamodb_attribute_value(value)
-            )
+            expression_attribute_values[placeholder] = self.condition_parser.to_dynamodb_attribute_value(value)
             value_counter += 1
             return placeholder
 
@@ -406,11 +369,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         pk_condition_index = -1
         if partition_key_name:
             for i, cond in enumerate(conditions):
-                if (
-                    cond.get("column") == partition_key_name
-                    and cond.get("operator") == "="
-                    and cond.get("values")
-                ):
+                if cond.get("column") == partition_key_name and cond.get("operator") == "=" and cond.get("values"):
                     pk_condition_index = i
                     break
 
@@ -449,18 +408,12 @@ class DynamoDBPartiQLBackend(CursorBackend):
                             if len(cond["values"]) == 2:
                                 sk_value1_ph = get_value_placeholder(cond["values"][0])
                                 sk_value2_ph = get_value_placeholder(cond["values"][1])
-                                key_condition_parts.append(
-                                    f"{sk_name_ph} BETWEEN {sk_value1_ph} AND {sk_value2_ph}"
-                                )
+                                key_condition_parts.append(f"{sk_name_ph} BETWEEN {sk_value1_ph} AND {sk_value2_ph}")
                             else:
-                                logger.warning(
-                                    f"Skipping malformed BETWEEN condition for sort key: {cond}"
-                                )
+                                logger.warning(f"Skipping malformed BETWEEN condition for sort key: {cond}")
                         elif op_lower == "begins_with":
                             sk_value_ph = get_value_placeholder(cond["values"][0])
-                            key_condition_parts.append(
-                                f"begins_with({sk_name_ph}, {sk_value_ph})"
-                            )
+                            key_condition_parts.append(f"begins_with({sk_name_ph}, {sk_value_ph})")
                         else:
                             # Other operators for sort key are not part of KeyConditionExpression
                             # They will be handled in FilterExpression below
@@ -505,9 +458,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
                 if len(vals) == 2:
                     value1_ph = get_value_placeholder(vals[0])
                     value2_ph = get_value_placeholder(vals[1])
-                    filter_expression_parts.append(
-                        f"{name_ph} BETWEEN {value1_ph} AND {value2_ph}"
-                    )
+                    filter_expression_parts.append(f"{name_ph} BETWEEN {value1_ph} AND {value2_ph}")
                 else:
                     logger.warning(f"Skipping malformed BETWEEN condition: {cond}")
             elif op_lower == "in":
@@ -524,16 +475,12 @@ class DynamoDBPartiQLBackend(CursorBackend):
                 filter_expression_parts.append(f"begins_with({name_ph}, {value_ph})")
             elif op_lower == "not begins_with":
                 value_ph = get_value_placeholder(vals[0])
-                filter_expression_parts.append(
-                    f"NOT begins_with({name_ph}, {value_ph})"
-                )
+                filter_expression_parts.append(f"NOT begins_with({name_ph}, {value_ph})")
             elif op_lower == "is null":
                 filter_expression_parts.append(f"attribute_not_exists({name_ph})")
             elif op_lower == "is not null":
                 filter_expression_parts.append(f"attribute_exists({name_ph})")
-            elif (
-                op_lower == "like"
-            ):  # Clearskies 'like' usually translates to begins_with or contains
+            elif op_lower == "like":  # Clearskies 'like' usually translates to begins_with or contains
                 # This is a simplification. A full implementation might need to inspect '%' position.
                 # For now, if it contains '%', assume 'contains'. If it ends with '%', assume 'begins_with'.
                 # If no '%', it's an equality.
@@ -541,23 +488,17 @@ class DynamoDBPartiQLBackend(CursorBackend):
                     like_value = vals[0]
                     if like_value.startswith("%") and like_value.endswith("%"):
                         value_ph = get_value_placeholder(like_value.strip("%"))
-                        filter_expression_parts.append(
-                            f"contains({name_ph}, {value_ph})"
-                        )
+                        filter_expression_parts.append(f"contains({name_ph}, {value_ph})")
                     elif like_value.endswith("%"):
                         value_ph = get_value_placeholder(like_value.rstrip("%"))
-                        filter_expression_parts.append(
-                            f"begins_with({name_ph}, {value_ph})"
-                        )
+                        filter_expression_parts.append(f"begins_with({name_ph}, {value_ph})")
                     else:  # Treat as equality if no wildcards or complex pattern
                         value_ph = get_value_placeholder(like_value)
                         filter_expression_parts.append(f"{name_ph} = {value_ph}")
                 else:
                     logger.warning(f"Skipping unsupported LIKE condition: {cond}")
             else:
-                logger.warning(
-                    f"Skipping unsupported operator '{op}' for native DynamoDB expressions: {cond}"
-                )
+                logger.warning(f"Skipping unsupported operator '{op}' for native DynamoDB expressions: {cond}")
 
         result: Dict[str, Any] = {}
         if key_condition_parts:
@@ -572,22 +513,18 @@ class DynamoDBPartiQLBackend(CursorBackend):
         return result
 
     def count(self, configuration: Dict[str, Any], model: ClearSkiesModel) -> int:
-        """
-        Counts records in DynamoDB using native Query or Scan operations.
-        """
+        """Count records in DynamoDB using native Query or Scan operations."""
         configuration = self._check_query_configuration(configuration, model)
 
         table_name: str = configuration["table_name"]
         chosen_index_name: Optional[str] = configuration.get("_chosen_index_name")
-        partition_key_for_target: Optional[str] = configuration.get(
-            "_partition_key_for_target"
-        )
+        partition_key_for_target: Optional[str] = configuration.get("_partition_key_for_target")
         # Get sort key for the chosen target (base table or GSI)
         sort_key_for_target: Optional[str] = None
         table_description = self._get_table_description(table_name)
         if chosen_index_name:
-            gsi_definitions: List[GlobalSecondaryIndexDescriptionTypeDef] = (
-                table_description.get("GlobalSecondaryIndexes", [])
+            gsi_definitions: List[GlobalSecondaryIndexDescriptionTypeDef] = table_description.get(
+                "GlobalSecondaryIndexes", []
             )
             for gsi in gsi_definitions:
                 if gsi.get("IndexName", "") == chosen_index_name:
@@ -597,9 +534,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
                             break
                     break
         else:
-            base_table_key_schema: List[KeySchemaElementTypeDef] = (
-                table_description.get("KeySchema", [])
-            )
+            base_table_key_schema: List[KeySchemaElementTypeDef] = table_description.get("KeySchema", [])
             for key_element in base_table_key_schema:
                 if key_element["KeyType"] == "RANGE":
                     sort_key_for_target = key_element["AttributeName"]
@@ -628,37 +563,25 @@ class DynamoDBPartiQLBackend(CursorBackend):
             in native_expressions.get("ExpressionAttributeNames", {})
             and native_expressions.get("KeyConditionExpression")
             and f"#{re.sub(r'[^a-zA-Z0-9_]', '', partition_key_for_target)}_0 = :val0"
-            in native_expressions[
-                "KeyConditionExpression"
-            ]  # Simplified check, assumes first value is PK
+            in native_expressions["KeyConditionExpression"]  # Simplified check, assumes first value is PK
         ):
             can_use_query_for_count = True
-            params_for_native_call["KeyConditionExpression"] = native_expressions[
-                "KeyConditionExpression"
-            ]
+            params_for_native_call["KeyConditionExpression"] = native_expressions["KeyConditionExpression"]
             if native_expressions.get("FilterExpression"):
-                params_for_native_call["FilterExpression"] = native_expressions[
-                    "FilterExpression"
-                ]
+                params_for_native_call["FilterExpression"] = native_expressions["FilterExpression"]
         else:
             # Fall back to Scan, and all conditions (including any potential key conditions that
             # couldn't be used for a Query) go into FilterExpression.
             if native_expressions.get("FilterExpression"):
-                params_for_native_call["FilterExpression"] = native_expressions[
-                    "FilterExpression"
-                ]
+                params_for_native_call["FilterExpression"] = native_expressions["FilterExpression"]
             # If there's a KeyConditionExpression but no PK equality, it should also be part of the filter for scan.
             # This logic is now handled more robustly within _wheres_to_native_dynamo_expressions
             # by ensuring only true PK/SK conditions go to KeyConditionExpression initially.
 
         if native_expressions.get("ExpressionAttributeNames"):
-            params_for_native_call["ExpressionAttributeNames"] = native_expressions[
-                "ExpressionAttributeNames"
-            ]
+            params_for_native_call["ExpressionAttributeNames"] = native_expressions["ExpressionAttributeNames"]
         if native_expressions.get("ExpressionAttributeValues"):
-            params_for_native_call["ExpressionAttributeValues"] = native_expressions[
-                "ExpressionAttributeValues"
-            ]
+            params_for_native_call["ExpressionAttributeValues"] = native_expressions["ExpressionAttributeValues"]
 
         total_count = 0
         exclusive_start_key: Optional[Dict[str, AttributeValueTypeDef]] = None
@@ -669,14 +592,10 @@ class DynamoDBPartiQLBackend(CursorBackend):
 
             try:
                 if can_use_query_for_count:
-                    logger.debug(
-                        f"Executing native DynamoDB Query (for count) with params: {params_for_native_call}"
-                    )
+                    logger.debug(f"Executing native DynamoDB Query (for count) with params: {params_for_native_call}")
                     response = self._cursor._client.query(**params_for_native_call)  # type: ignore
                 else:
-                    logger.debug(
-                        f"Executing native DynamoDB Scan (for count) with params: {params_for_native_call}"
-                    )
+                    logger.debug(f"Executing native DynamoDB Scan (for count) with params: {params_for_native_call}")
                     response = self._cursor._client.scan(**params_for_native_call)  # type: ignore
             except ClientError as e:
                 logger.error(
@@ -692,9 +611,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
         return total_count
 
     def create(self, data: Dict[str, Any], model: ClearSkiesModel) -> Dict[str, Any]:
-        """
-        Creates a new record in DynamoDB using PartiQL INSERT.
-        """
+        """Create a new record in DynamoDB using PartiQL INSERT."""
         table_name: str = self._finalize_table_name(model.get_table_name())
 
         if not data:
@@ -722,27 +639,17 @@ class DynamoDBPartiQLBackend(CursorBackend):
             )
             return data
         except Exception as e:
-            logger.error(
-                f"Error executing INSERT PartiQL statement: {statement}, data: {data}, error: {e}"
-            )
+            logger.error(f"Error executing INSERT PartiQL statement: {statement}, data: {data}, error: {e}")
             raise
 
-    def update(
-        self, id_value: Any, data: Dict[str, Any], model: ClearSkiesModel
-    ) -> Dict[str, Any]:
-        """
-        Updates an existing record in DynamoDB using PartiQL UPDATE.
-        """
+    def update(self, id_value: Any, data: Dict[str, Any], model: ClearSkiesModel) -> Dict[str, Any]:
+        """Update an existing record in DynamoDB using PartiQL UPDATE."""
         table_name: str = self._finalize_table_name(model.get_table_name())
         id_column_name: str = model.id_column_name
-        escaped_id_column: str = (
-            f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
-        )
+        escaped_id_column: str = f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
 
         if not data:
-            logger.warning(
-                f"Update called with empty data for ID {id_value}. Returning ID only."
-            )
+            logger.warning(f"Update called with empty data for ID {id_value}. Returning ID only.")
             return {id_column_name: id_value}
 
         set_clauses: List[str] = []
@@ -756,17 +663,13 @@ class DynamoDBPartiQLBackend(CursorBackend):
             parameters.append(self.condition_parser.to_dynamodb_attribute_value(value))
 
         if not set_clauses:
-            logger.warning(
-                f"Update called for ID {id_value} but no updatable fields found in data. Returning ID only."
-            )
+            logger.warning(f"Update called for ID {id_value} but no updatable fields found in data. Returning ID only.")
             return {id_column_name: id_value}
 
         parameters.append(self.condition_parser.to_dynamodb_attribute_value(id_value))
 
         set_statement: str = ", ".join(set_clauses)
-        statement: str = (
-            f"UPDATE {table_name} SET {set_statement} WHERE {escaped_id_column} = ? RETURNING ALL NEW *"
-        )
+        statement: str = f"UPDATE {table_name} SET {set_statement} WHERE {escaped_id_column} = ? RETURNING ALL NEW *"
 
         try:
             response = self._cursor.execute(statement=statement, parameters=parameters)
@@ -785,33 +688,26 @@ class DynamoDBPartiQLBackend(CursorBackend):
             raise
 
     def delete(self, id_value: Any, model: ClearSkiesModel) -> bool:
-        """
-        Deletes a record from DynamoDB using PartiQL DELETE.
-        """
+        """Delete a record from DynamoDB using PartiQL DELETE."""
         table_name: str = self._finalize_table_name(model.get_table_name())
         id_column_name: str = model.id_column_name
-        escaped_id_column: str = (
-            f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
-        )
+        escaped_id_column: str = f"{self._column_escape_character()}{id_column_name}{self._column_escape_character()}"
 
-        parameters: List[AttributeValueTypeDef] = [
-            self.condition_parser.to_dynamodb_attribute_value(id_value)
-        ]
+        parameters: List[AttributeValueTypeDef] = [self.condition_parser.to_dynamodb_attribute_value(id_value)]
         statement: str = f"DELETE FROM {table_name} WHERE {escaped_id_column} = ?"
 
         try:
             self._cursor.execute(statement=statement, parameters=parameters)
             return True
         except Exception as e:
-            logger.error(
-                f"Error executing DELETE PartiQL statement: {statement}, id: {id_value}, error: {e}"
-            )
+            logger.error(f"Error executing DELETE PartiQL statement: {statement}, id: {id_value}, error: {e}")
             raise
 
     def _map_from_boto3(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Maps a raw record from DynamoDB (which uses AttributeValueTypeDef for values)
-        to a dictionary with Python-native types.
+        Convert DynamoDB record to Python-native dictionary.
+
+        Maps AttributeValueTypeDef values from DynamoDB to standard Python types for easier processing.
 
         Args:
             record: A dictionary representing a record item from DynamoDB,
@@ -820,13 +716,11 @@ class DynamoDBPartiQLBackend(CursorBackend):
         Returns:
             A dictionary with values unwrapped to Python native types.
         """
-        return {
-            key: self._map_from_boto3_value(value) for (key, value) in record.items()
-        }
+        return {key: self._map_from_boto3_value(value) for (key, value) in record.items()}
 
     def _map_from_boto3_value(self, attribute_value: AttributeValueTypeDef) -> Any:
         """
-        Converts a single DynamoDB AttributeValueTypeDef to its Python native equivalent.
+        Convert a single DynamoDB AttributeValueTypeDef to its Python native equivalent.
 
         Args:
             attribute_value: A DynamoDB AttributeValueTypeDef dictionary.
@@ -843,9 +737,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
             try:
                 return Decimal(attribute_value["N"])
             except InvalidOperation:  # Changed from DecimalException
-                logger.warning(
-                    f"Could not convert N value '{attribute_value['N']}' to Decimal."
-                )
+                logger.warning(f"Could not convert N value '{attribute_value['N']}' to Decimal.")
                 return attribute_value["N"]
         if "BOOL" in attribute_value:
             return attribute_value["BOOL"]
@@ -855,26 +747,19 @@ class DynamoDBPartiQLBackend(CursorBackend):
             try:
                 return base64.b64decode(attribute_value["B"])
             except (binascii.Error, TypeError) as e:
-                logger.warning(
-                    f"Failed to decode base64 binary value: {attribute_value['B']}, error: {e}"
-                )
+                logger.warning(f"Failed to decode base64 binary value: {attribute_value['B']}, error: {e}")
                 return attribute_value["B"]  # Return raw if decoding fails
         if "L" in attribute_value:
             return [self._map_from_boto3_value(item) for item in attribute_value["L"]]
         if "M" in attribute_value:
-            return {
-                key: self._map_from_boto3_value(val)
-                for key, val in attribute_value["M"].items()
-            }
+            return {key: self._map_from_boto3_value(val) for key, val in attribute_value["M"].items()}
         if "SS" in attribute_value:
             return set(attribute_value["SS"])
         if "NS" in attribute_value:
             try:
                 return set(Decimal(n_val) for n_val in attribute_value["NS"])
             except InvalidOperation:  # Changed from DecimalException
-                logger.warning(
-                    f"Could not convert one or more NS values in '{attribute_value['NS']}' to Decimal."
-                )
+                logger.warning(f"Could not convert one or more NS values in '{attribute_value['NS']}' to Decimal.")
                 return set(attribute_value["NS"])
         if "BS" in attribute_value:
             try:
@@ -888,19 +773,18 @@ class DynamoDBPartiQLBackend(CursorBackend):
         logger.warning(f"Unrecognized DynamoDB attribute type: {attribute_value}")
         return attribute_value
 
-    def _check_query_configuration(
-        self, configuration: Dict[str, Any], model: ClearSkiesModel
-    ) -> Dict[str, Any]:
+    def _check_query_configuration(self, configuration: Dict[str, Any], model: ClearSkiesModel) -> Dict[str, Any]:
         """
-        Validates the query configuration, applies default values, and attempts to
+        Validate and update query configuration.
+
+        Checks the configuration, sets defaults, and ensures required fields for a valid query.
         select an appropriate GSI if sorting is requested and conditions allow.
+
         It also stores the determined partition key for the target in the configuration.
         """
         for key in list(configuration.keys()):
             if key not in self._allowed_configs:
-                raise KeyError(
-                    f"DynamoDBBackend does not support config '{key}'. You may be using the wrong backend"
-                )
+                raise KeyError(f"DynamoDBBackend does not support config '{key}'. You may be using the wrong backend")
         for key in self._required_configs:
             if not configuration.get(key):
                 raise KeyError(f"Missing required configuration key {key}")
@@ -927,26 +811,21 @@ class DynamoDBPartiQLBackend(CursorBackend):
         configuration["_chosen_index_name"] = None
         configuration["_partition_key_for_target"] = None
 
-        if configuration.get("sorts") or configuration.get(
-            "wheres"
-        ):  # Check for index even if not sorting, for count
+        if configuration.get("sorts") or configuration.get("wheres"):  # Check for index even if not sorting, for count
             table_name_from_config: str = configuration.get("table_name", "")
             table_description = self._get_table_description(table_name_from_config)
 
             wheres = configuration.get("wheres", [])
-            sort_column = (
-                configuration.get("sorts")[0]["column"]
-                if configuration.get("sorts")
-                else None
-            )
+            sorts = configuration.get("sorts")
+            sort_column = sorts[0]["column"] if sorts and len(sorts) > 0 and sorts[0] is not None and "column" in sorts[0] else None
 
             key_to_check_for_equality: Optional[str] = None
             target_name_for_error_msg: str = table_name_from_config
             chosen_index_for_query: Optional[str] = None
             partition_key_for_chosen_target: Optional[str] = None
 
-            gsi_definitions: List[GlobalSecondaryIndexDescriptionTypeDef] = (
-                table_description.get("GlobalSecondaryIndexes", [])
+            gsi_definitions: List[GlobalSecondaryIndexDescriptionTypeDef] = table_description.get(
+                "GlobalSecondaryIndexes", []
             )
             if gsi_definitions:
                 for gsi in gsi_definitions:
@@ -962,8 +841,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
                             gsi_sort_key = key_element["AttributeName"]
 
                     if gsi_partition_key and any(
-                        w.get("column") == gsi_partition_key
-                        and w.get("operator") == "="
+                        w.get("column") == gsi_partition_key and w.get("operator") == "="
                         for w in wheres
                         if isinstance(w, dict)
                     ):
@@ -971,39 +849,29 @@ class DynamoDBPartiQLBackend(CursorBackend):
                             if sort_column == gsi_partition_key and not gsi_sort_key:
                                 key_to_check_for_equality = gsi_partition_key
                                 chosen_index_for_query = gsi_name
-                                target_name_for_error_msg = (
-                                    f"{table_name_from_config} (index: {gsi_name})"
-                                )
+                                target_name_for_error_msg = f"{table_name_from_config} (index: {gsi_name})"
                                 partition_key_for_chosen_target = gsi_partition_key
                                 break
                             if sort_column == gsi_sort_key:
                                 key_to_check_for_equality = gsi_partition_key
                                 chosen_index_for_query = gsi_name
-                                target_name_for_error_msg = (
-                                    f"{table_name_from_config} (index: {gsi_name})"
-                                )
+                                target_name_for_error_msg = f"{table_name_from_config} (index: {gsi_name})"
                                 partition_key_for_chosen_target = gsi_partition_key
                                 break
                         else:
                             key_to_check_for_equality = gsi_partition_key
                             chosen_index_for_query = gsi_name
-                            target_name_for_error_msg = (
-                                f"{table_name_from_config} (index: {gsi_name})"
-                            )
+                            target_name_for_error_msg = f"{table_name_from_config} (index: {gsi_name})"
                             partition_key_for_chosen_target = gsi_partition_key
                             break
 
             if not chosen_index_for_query:
-                base_table_key_schema: List[KeySchemaElementTypeDef] = (
-                    table_description.get("KeySchema", [])
-                )
+                base_table_key_schema: List[KeySchemaElementTypeDef] = table_description.get("KeySchema", [])
                 if base_table_key_schema:
                     for key_element in base_table_key_schema:
                         if key_element["KeyType"] == "HASH":
                             key_to_check_for_equality = key_element["AttributeName"]
-                            partition_key_for_chosen_target = key_element[
-                                "AttributeName"
-                            ]
+                            partition_key_for_chosen_target = key_element["AttributeName"]
                             break
 
             configuration["_chosen_index_name"] = chosen_index_for_query
@@ -1017,8 +885,7 @@ class DynamoDBPartiQLBackend(CursorBackend):
                     )
                 else:
                     has_required_key_equality = any(
-                        w.get("column") == key_to_check_for_equality
-                        and w.get("operator") == "="
+                        w.get("column") == key_to_check_for_equality and w.get("operator") == "="
                         for w in wheres
                         if isinstance(w, dict)
                     )
@@ -1029,19 +896,12 @@ class DynamoDBPartiQLBackend(CursorBackend):
                         )
         return configuration
 
-    def validate_pagination_kwargs(
-        self, kwargs: Dict[str, Any], case_mapping: Callable[[str], str]
-    ) -> str:
-        """
-        Validates pagination keyword arguments.
-        """
+    def validate_pagination_kwargs(self, kwargs: Dict[str, Any], case_mapping: Callable[[str], str]) -> str:
+        """Validate pagination keyword arguments."""
         extra_keys: set[str] = set(kwargs.keys()) - set(self.allowed_pagination_keys())
         key_name: str = case_mapping("next_token")
         if len(extra_keys):
-            return (
-                f"Invalid pagination key(s): '{','.join(sorted(list(extra_keys)))}'. "
-                f"Only '{key_name}' is allowed"
-            )
+            return f"Invalid pagination key(s): '{','.join(sorted(list(extra_keys)))}'. Only '{key_name}' is allowed"
         if "next_token" not in kwargs:
             return f"You must specify '{key_name}' when setting pagination"
         try:
@@ -1054,17 +914,11 @@ class DynamoDBPartiQLBackend(CursorBackend):
         return ""
 
     def allowed_pagination_keys(self) -> List[str]:
-        """
-        Returns a list of allowed keys for pagination.
-        """
+        """Return a list of allowed keys for pagination."""
         return ["next_token"]
 
-    def restore_next_token_from_config(
-        self, next_token: Optional[str]
-    ) -> Optional[Any]:
-        """
-        Decodes a base64 encoded JSON string (next_token) into its original form.
-        """
+    def restore_next_token_from_config(self, next_token: Optional[str]) -> Optional[Any]:
+        """Decode a base64 encoded JSON string (next_token) into its original form."""
         if not next_token or not isinstance(next_token, str):
             return None
         try:
@@ -1075,12 +929,8 @@ class DynamoDBPartiQLBackend(CursorBackend):
             logger.warning(f"Failed to restore next_token: {next_token}")
             return None
 
-    def serialize_next_token_for_response(
-        self, ddb_next_token: Optional[str]
-    ) -> Optional[str]:
-        """
-        Serializes a DynamoDB PartiQL NextToken string into a base64 encoded JSON string.
-        """
+    def serialize_next_token_for_response(self, ddb_next_token: Optional[str]) -> Optional[str]:
+        """Serialize a DynamoDB PartiQL NextToken string into a base64 encoded JSON string."""
         if ddb_next_token is None:
             return None
         try:
@@ -1088,33 +938,21 @@ class DynamoDBPartiQLBackend(CursorBackend):
             encoded_bytes: bytes = base64.urlsafe_b64encode(json_string.encode("utf-8"))
             return encoded_bytes.decode("utf8")
         except (TypeError, ValueError) as e:
-            logger.error(
-                f"Error serializing DDB next_token: {ddb_next_token}, error: {e}"
-            )
+            logger.error(f"Error serializing DDB next_token: {ddb_next_token}, error: {e}")
             return None
 
-    def documentation_pagination_next_page_response(
-        self, case_mapping: Callable[[str], str]
-    ) -> List[AutoDocString]:
-        """
-        Provides documentation for the 'next_page' (pagination token) in API responses.
-        """
+    def documentation_pagination_next_page_response(self, case_mapping: Callable[[str], str]) -> List[AutoDocString]:
+        """Provide documentation for the 'next_page' (pagination token) in API responses."""
         return [AutoDocString(case_mapping("next_token"))]
 
-    def documentation_pagination_next_page_example(
-        self, case_mapping: Callable[[str], str]
-    ) -> Dict[str, str]:
-        """
-        Provides an example value for the 'next_page' (pagination token) in API responses.
-        """
+    def documentation_pagination_next_page_example(self, case_mapping: Callable[[str], str]) -> Dict[str, str]:
+        """Provide an example value for the 'next_page' (pagination token) in API responses."""
         return {case_mapping("next_token"): ""}
 
     def documentation_pagination_parameters(
         self, case_mapping: Callable[[str], str]
     ) -> List[Tuple[AutoDocString, str]]:
-        """
-        Provides documentation for pagination parameters in API requests.
-        """
+        """Provide documentation for pagination parameters in API requests."""
         return [
             (
                 AutoDocString(case_mapping("next_token"), example=""),

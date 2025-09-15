@@ -1,13 +1,15 @@
-import boto3
+from types import ModuleType
+from typing import Callable, List, Optional, cast
 
+import boto3
 from clearskies.environment import Environment
 from clearskies.models import Models
-from types import ModuleType
-from typing import List, Optional, Callable, cast
 
 from ..di import StandardDependencies
-from .assume_role import AssumeRole
 from .action_aws import ActionAws
+from .assume_role import AssumeRole
+
+
 class StepFunction(ActionAws):
     _name = "stepfunctions"
 
@@ -16,7 +18,7 @@ class StepFunction(ActionAws):
 
     def configure(
         self,
-        arn: Optional[str]=None,
+        arn: Optional[str] = None,
         arn_environment_key: Optional[str] = None,
         arn_callable: Optional[Callable] = None,
         column_to_store_execution_arn: Optional[str] = None,
@@ -24,7 +26,7 @@ class StepFunction(ActionAws):
         when: Optional[Callable] = None,
         assume_role: Optional[AssumeRole] = None,
     ) -> None:
-        """Configures the action for the step function."""
+        """Configure the Step Function action."""
         super().configure(message_callable=message_callable, when=when, assume_role=assume_role)
 
         self.arn = arn
@@ -47,7 +49,7 @@ class StepFunction(ActionAws):
         """Send a notification as configured."""
         arn = self.get_arn(model)
         default_region = self.default_region()
-        arn_region = arn.split(':')[3]
+        arn_region = arn.split(":")[3]
         if default_region and default_region != arn_region:
             client = self._getClient(region=arn_region)
         response = client.start_execution(
@@ -56,7 +58,7 @@ class StepFunction(ActionAws):
         )
 
         if self.column_to_store_execution_arn:
-            model.save({self.column_to_store_execution_arn: response['executionArn']})
+            model.save({self.column_to_store_execution_arn: response["executionArn"]})
 
     def get_arn(self, model: Models) -> str:
         if self.arn:

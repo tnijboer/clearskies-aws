@@ -1,26 +1,27 @@
-import boto3
 import json
 import logging
-
 from abc import ABC
-from boto3 import client
-from botocore.exceptions import ClientError
-from clearskies.environment import Environment
-from clearskies.models import Models
-from clearskies.functional import string
 from collections import OrderedDict
 from typing import Callable, Optional
 
+import boto3
+from boto3 import client
+from botocore.exceptions import ClientError
+from clearskies.environment import Environment
+from clearskies.functional import string
+from clearskies.models import Models
+
 from ..di import StandardDependencies
 from .assume_role import AssumeRole
-class ActionAws(ABC):
 
+
+class ActionAws(ABC):
     _logging = logging.getLogger(__name__)
     _client: Optional[boto3.client] = None
     _name: Optional[str] = None
 
     def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
-        """Setup action."""
+        """Set up the AWS action."""
         self.environment = environment
         self.boto3 = boto3
         self.di = di
@@ -47,8 +48,10 @@ class ActionAws(ABC):
         if not self._name:
             raise ValueError(f"Name of client not set.")
 
-        if not self.environment.get('AWS_REGION', True) and not self.environment.get('AWS_DEFAULT_REGION', True):
-            raise ValueError("You must set either the AWS_REGION or AWS_DEFAULT_REGION environment variable when using AWS actions")
+        if not self.environment.get("AWS_REGION", True) and not self.environment.get("AWS_DEFAULT_REGION", True):
+            raise ValueError(
+                "You must set either the AWS_REGION or AWS_DEFAULT_REGION environment variable when using AWS actions"
+            )
 
     def __call__(self, model: Models) -> None:
         """Send a notification as configured."""
@@ -85,10 +88,10 @@ class ActionAws(ABC):
         return client
 
     def default_region(self):
-        region = self.environment.get('AWS_REGION', silent=True)
+        region = self.environment.get("AWS_REGION", silent=True)
         if region:
             return region
-        region = self.environment.get('DEFAULT_AWS_REGION', silent=True)
+        region = self.environment.get("DEFAULT_AWS_REGION", silent=True)
         if region:
             return region
         return None
@@ -111,7 +114,7 @@ class ActionAws(ABC):
             return result
 
         model_data = OrderedDict()
-        for (column_name, column) in model.columns().items():
+        for column_name, column in model.columns().items():
             if not column.is_readable:
                 continue
             model_data.update(column.to_json(model))

@@ -1,7 +1,9 @@
-from .mysql_connection_dynamic_producer_via_ssh_cert_bastion import MySQLConnectionDynamicProducerViaSSHCertBastion
-from .mysql_connection_dynamic_producer_via_ssm_bastion import MySQLConnectionDynamicProducerViaSSMBastion
 from .iam_db_auth import IAMDBAuth
 from .iam_db_auth_with_ssm import IAMDBAuthWithSSM
+from .mysql_connection_dynamic_producer_via_ssh_cert_bastion import MySQLConnectionDynamicProducerViaSSHCertBastion
+from .mysql_connection_dynamic_producer_via_ssm_bastion import MySQLConnectionDynamicProducerViaSSMBastion
+
+
 def mysql_connection_dynamic_producer_via_ssh_cert_bastion(
     producer_name=None,
     bastion_host=None,
@@ -26,6 +28,8 @@ def mysql_connection_dynamic_producer_via_ssh_cert_bastion(
         database_name=database_name,
         local_proxy_port=local_proxy_port,
     )
+
+
 def mysql_connection_dynamic_producer_via_ssm_bastion(
     producer_name=None,
     bastion_instance_id=None,
@@ -48,7 +52,11 @@ def mysql_connection_dynamic_producer_via_ssm_bastion(
         database_name=database_name,
         local_proxy_port=local_proxy_port,
     )
+
+
 def iam_db_auth():
     return IAMDBAuth()
+
+
 def iam_db_auth_with_ssm():
     return IAMDBAuthWithSSM()

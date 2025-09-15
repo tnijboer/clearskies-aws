@@ -8,7 +8,7 @@ from clearskies.autodoc.schema import Schema as AutoDocSchema
 
 class DummyBackend(clearskies.backends.backend.Backend):
     """
-    Conecting models to their data since 2020!
+    Connect models to their data since 2020.
 
     The backend system acts as a flexible layer between models and their data sources.  By changing the backend attached to a model,
     you change where the model fetches and saves data.  This might be a database, an in-memory data store, a dynamodb table,
@@ -23,15 +23,11 @@ class DummyBackend(clearskies.backends.backend.Backend):
     supports_n_plus_one = False
     can_count = True
 
-    def update(
-        self, id: int | str, data: dict[str, Any], model: clearskies.model.Model
-    ) -> dict[str, Any]:
+    def update(self, id: int | str, data: dict[str, Any], model: clearskies.model.Model) -> dict[str, Any]:
         """Update the record with the given id with the information from the data dictionary."""
         return {}
 
-    def create(
-        self, data: dict[str, Any], model: clearskies.model.Model
-    ) -> dict[str, Any]:
+    def create(self, data: dict[str, Any], model: clearskies.model.Model) -> dict[str, Any]:
         """Create a record with the information from the data dictionary."""
         return {}
 
@@ -57,9 +53,7 @@ class DummyBackend(clearskies.backends.backend.Backend):
         """
         return []
 
-    def validate_pagination_data(
-        self, data: dict[str, Any], case_mapping: Callable[[str], str]
-    ) -> str:
+    def validate_pagination_data(self, data: dict[str, Any], case_mapping: Callable[[str], str]) -> str:
         """
         Check if the given dictionary is valid pagination data for the background.
 
@@ -76,9 +70,7 @@ class DummyBackend(clearskies.backends.backend.Backend):
         """
         return []
 
-    def documentation_pagination_next_page_response(
-        self, case_mapping: Callable
-    ) -> list[Any]:
+    def documentation_pagination_next_page_response(self, case_mapping: Callable) -> list[Any]:
         """
         Return a list of autodoc schema objects.
 
@@ -87,9 +79,7 @@ class DummyBackend(clearskies.backends.backend.Backend):
         """
         return []
 
-    def documentation_pagination_parameters(
-        self, case_mapping: Callable
-    ) -> list[tuple[AutoDocSchema, str]]:
+    def documentation_pagination_parameters(self, case_mapping: Callable) -> list[tuple[AutoDocSchema, str]]:
         """
         Return a list of autodoc schema objects describing the allowed input keys to set pagination.
 
@@ -98,9 +88,7 @@ class DummyBackend(clearskies.backends.backend.Backend):
         """
         return []
 
-    def documentation_pagination_next_page_example(
-        self, case_mapping: Callable
-    ) -> dict[str, Any]:
+    def documentation_pagination_next_page_example(self, case_mapping: Callable) -> dict[str, Any]:
         """
         Return an example for next page documentation.
 

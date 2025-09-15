@@ -10,9 +10,7 @@ class AkeylessWithSsmCache(AKeyless):
         super().__init__(requests, environment)
         self._boto3 = boto3
         if not self._environment.get("AWS_REGION", True):
-            raise ValueError(
-                "To use parameter store you must use set the 'AWS_REGION' environment variable"
-            )
+            raise ValueError("To use parameter store you must use set the 'AWS_REGION' environment variable")
 
     def get(self, path, refresh=False):
         ssm = self._boto3.client("ssm", region_name="us-east-1")

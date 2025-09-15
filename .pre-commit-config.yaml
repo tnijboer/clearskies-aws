@@ -1,8 +1,83 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
+# Pre-commit configuration for  Akeyless Custom Producer
+fail_fast: true
+
+ci:
+    autofix_commit_msg: "chore(pre-commit): autofix run"
+    autoupdate_commit_msg: "chore(pre-commit): autoupdate hooks"
+
+default_install_hook_types:
+    - pre-commit
+    - commit-msg
+    - post-checkout
+    - post-merge
+    - post-rewrite
+
+default_stages: ["pre-commit"]
+
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: mixed-line-ending
+      - id: check-merge-conflict
+        args: [--assume-in-merge]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.2.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: []
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.8.13
+    hooks:
+      - id: uv-lock
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        files: \.py$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.16.1
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-requests]
+        files: \.py$
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-d, relaxed]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest .
+        language: system
+        types: [python]
+        pass_filenames: false
+    # Prevent committing .rej files
+      - id: forbidden-files
+        name: forbidden files
+        entry:
+            found Copier update rejection files; review and remove them before
+            merging.
+        language: fail
+        files: "\\.rej$"

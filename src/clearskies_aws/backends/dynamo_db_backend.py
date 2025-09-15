@@ -80,16 +80,16 @@ class DynamoDBBackend(Backend):
     _dynamodb = None
 
     _allowed_configs = [
-        'table_name',
-        'wheres',
-        'sorts',
-        'limit',
-        'pagination',
-        'model_columns',
+        "table_name",
+        "wheres",
+        "sorts",
+        "limit",
+        "pagination",
+        "model_columns",
     ]
 
     _required_configs = [
-        'table_name',
+        "table_name",
     ]
 
     _table_indexes = None
@@ -99,35 +99,33 @@ class DynamoDBBackend(Backend):
     # this is the list of operators that we can use when querying a dynamodb index and their corresponding
     # key method name in dynamodb
     _index_operators = {
-        '=': 'eq',
-        '<': 'lt',
-        '>': 'gt',
-        '>=': 'gte',
-        '<=': 'lte',
+        "=": "eq",
+        "<": "lt",
+        ">": "gt",
+        ">=": "gte",
+        "<=": "lte",
     }
 
     # this is a map from clearskies operators to the equivalent dynamodb attribute operators
     _attribute_operators = {
-        '!=': 'ne',
-        '<=': 'lte',
-        '>=': 'gte',
-        '>': 'gt',
-        '<': 'lt',
-        '=': 'eq',
-        'IS NOT NULL': 'exists',
-        'IS NULL': 'not_exists',
-        'IS NOT': 'ne',
-        'IS': 'eq',
-        'LIKE': '',    # requires special handling
+        "!=": "ne",
+        "<=": "lte",
+        ">=": "gte",
+        ">": "gt",
+        "<": "lt",
+        "=": "eq",
+        "IS NOT NULL": "exists",
+        "IS NULL": "not_exists",
+        "IS NOT": "ne",
+        "IS": "eq",
+        "LIKE": "",  # requires special handling
     }
 
     def __init__(self):
         if not self.environment.get("AWS_REGION", True):
-            raise ValueError('To use DynamoDB you must use set AWS_REGION in the .env file or an environment variable')
+            raise ValueError("To use DynamoDB you must use set AWS_REGION in the .env file or an environment variable")
 
-        self._dynamodb = self.boto3.resource(
-            "dynamodb", region_name=self.environment.get("AWS_REGION", True)
-        )
+        self._dynamodb = self.boto3.resource("dynamodb", region_name=self.environment.get("AWS_REGION", True))
         self._table_indexes = {}
         self._model_columns_cache = {}
 
@@ -143,8 +141,7 @@ class DynamoDBBackend(Backend):
         key = {model.id_column_name: model.__getattr__(model.id_column_name)}
         if sort_column_name:
             key[sort_column_name] = data.get(
-                sort_column_name,
-                model.columns()[sort_column_name].to_backend(model._data)
+                sort_column_name, model.columns()[sort_column_name].to_backend(model._data)
             )
         table = self._dynamodb.Table(model.table_name())
 
@@ -152,18 +149,16 @@ class DynamoDBBackend(Backend):
 
         updated = table.update_item(
             Key=key,
-            UpdateExpression='SET ' + ', '.join([f"#{column_name} = :{column_name}" for column_name in data.keys()]),
+            UpdateExpression="SET " + ", ".join([f"#{column_name} = :{column_name}" for column_name in data.keys()]),
             ExpressionAttributeValues={
-                **{f':{column_name}': value
-                   for (column_name, value) in data.items()},
+                **{f":{column_name}": value for (column_name, value) in data.items()},
             },
             ExpressionAttributeNames={
-                **{f'#{column_name}': column_name
-                   for column_name in data.keys()},
+                **{f"#{column_name}": column_name for column_name in data.keys()},
             },
             ReturnValues="ALL_NEW",
         )
-        return self._map_from_boto3(updated['Attributes'])
+        return self._map_from_boto3(updated["Attributes"])
 
     def create(self, data, model):
         table = self._dynamodb.Table(model.table_name())
@@ -171,7 +166,7 @@ class DynamoDBBackend(Backend):
         return {**data}
 
     def excessive_type_casting(self, data):
-        for (key, value) in data.items():
+        for key, value in data.items():
             if isinstance(value, float):
                 data[key] = Decimal(value)
         return data
@@ -182,33 +177,33 @@ class DynamoDBBackend(Backend):
         return True
 
     def count(self, configuration, model):
-        response = self._dynamodb_query(configuration, model, 'COUNT')
-        return response['Count']
+        response = self._dynamodb_query(configuration, model, "COUNT")
+        return response["Count"]
 
-    def records(self,
-                configuration: Dict[str, Any],
-                model: model.Model,
-                next_page_data: Dict[str, str] = None) -> List[Dict[str, Any]]:
-        response = self._dynamodb_query(configuration, model, 'ALL_ATTRIBUTES')
-        if 'LastEvaluatedKey' in response and response['LastEvaluatedKey'] is not None and type(next_page_data) == dict:
-            next_page_data['next_token'] = self.serialize_next_token_for_response(
-                self._map_from_boto3(response['LastEvaluatedKey'])
+    def records(
+        self, configuration: Dict[str, Any], model: model.Model, next_page_data: Dict[str, str] = None
+    ) -> List[Dict[str, Any]]:
+        response = self._dynamodb_query(configuration, model, "ALL_ATTRIBUTES")
+        if "LastEvaluatedKey" in response and response["LastEvaluatedKey"] is not None and type(next_page_data) == dict:
+            next_page_data["next_token"] = self.serialize_next_token_for_response(
+                self._map_from_boto3(response["LastEvaluatedKey"])
             )
-        return [self._map_from_boto3(item) for item in response['Items']]
+        return [self._map_from_boto3(item) for item in response["Items"]]
 
     def _dynamodb_query(self, configuration, model, select_type):
-        [filter_expression, key_condition_expression, index_name,
-         scan_index_forward] = self._create_dynamodb_query_parameters(configuration, model)
+        [filter_expression, key_condition_expression, index_name, scan_index_forward] = (
+            self._create_dynamodb_query_parameters(configuration, model)
+        )
         table = self._dynamodb.Table(model.table_name())
 
         # so we want to put together the kwargs for scan/query:
         kwargs = {
-            'IndexName': index_name,
-            'KeyConditionExpression': key_condition_expression,
-            'FilterExpression': filter_expression,
-            'Select': select_type,
-            'ExclusiveStartKey': self.restore_next_token_from_config(configuration['pagination'].get('next_token')),
-            'Limit': configuration['limit'] if configuration['limit'] and select_type != 'COUNT' else None
+            "IndexName": index_name,
+            "KeyConditionExpression": key_condition_expression,
+            "FilterExpression": filter_expression,
+            "Select": select_type,
+            "ExclusiveStartKey": self.restore_next_token_from_config(configuration["pagination"].get("next_token")),
+            "Limit": configuration["limit"] if configuration["limit"] and select_type != "COUNT" else None,
         }
         # the trouble is that boto3 isn't okay with parameters of None.
         # therefore, we need to remove any of the above keys that are None
@@ -216,7 +211,7 @@ class DynamoDBBackend(Backend):
 
         if key_condition_expression:
             # add the scan index forward setting for key conditions
-            kwargs['ScanIndexForward'] = scan_index_forward
+            kwargs["ScanIndexForward"] = scan_index_forward
             return table.query(**kwargs)
         return table.scan(**kwargs)
 
@@ -224,13 +219,13 @@ class DynamoDBBackend(Backend):
         # DynamoDB only supports sorting by a single column, and only if we can find a supporting index
         # figure out if and what we are sorting by.
         sort_column = None
-        sort_direction = 'asc'
-        if 'sorts' in configuration and configuration['sorts']:
-            sort_column = configuration['sorts'][0]['column']
-            sort_direction = configuration['sorts'][0]['direction']
+        sort_direction = "asc"
+        if "sorts" in configuration and configuration["sorts"]:
+            sort_column = configuration["sorts"][0]["column"]
+            sort_direction = configuration["sorts"][0]["direction"]
 
         # if we have neither sort nor a where then we have a simple query and can finish up now.
-        if not sort_column and not configuration['wheres']:
+        if not sort_column and not configuration["wheres"]:
             return [None, None, None, True]
 
         # so the thing here is that if we find a condition that corresponds to an indexed
@@ -241,7 +236,7 @@ class DynamoDBBackend(Backend):
         # the query operation in dynamodb, so searching on an indexed column doesn't guarantee
         # that we can use a query.
         [key_condition_expression, index_name, remaining_conditions] = self._find_key_condition_expressions(
-            configuration['wheres'],
+            configuration["wheres"],
             model.id_column_name,
             sort_column,
             model,
@@ -250,8 +245,8 @@ class DynamoDBBackend(Backend):
         return [
             self._as_attr_filter_expressions(remaining_conditions, model),
             key_condition_expression,
-            index_name,    # we don't need to specify the name of the primary index
-            sort_direction.lower() == 'asc',
+            index_name,  # we don't need to specify the name of the primary index
+            sort_direction.lower() == "asc",
         ]
 
     def _find_key_condition_expressions(self, conditions, id_column_name, sort_column, model):
@@ -278,13 +273,13 @@ class DynamoDBBackend(Backend):
         id_conditions = []
         indexable_conditions = []
         secondary_conditions = []
-        for (index, condition) in enumerate(conditions):
-            column_name = condition['column']
+        for index, condition in enumerate(conditions):
+            column_name = condition["column"]
             # if the column isn't a hash index and isn't an equals search, then this condition "anchor" an index search.
-            if column_name not in indexes or condition['operator'] != '=':
+            if column_name not in indexes or condition["operator"] != "=":
                 # however, it may still contribute to a secondary condition in an index search, so record it
                 # if it uses a supporting operator
-                if condition['operator'] in self._index_operators:
+                if condition["operator"] in self._index_operators:
                     secondary_conditions.append(index)
 
             # if we get here then we have an '=' condition on a hash attribute in an index - we can use an index!
@@ -359,31 +354,31 @@ class DynamoDBBackend(Backend):
         """
         # the condition for the primary condition
         index_condition = conditions[primary_condition_index]
-        index_data = indexes[index_condition['column']]
+        index_data = indexes[index_condition["column"]]
 
         # our secondary columns are just suggestions, so see if we can actually use any
         index_condition_counts = {}
         for condition_index in secondary_condition_indexes:
             secondary_condition = conditions[condition_index]
-            secondary_column = secondary_condition['column']
-            if secondary_column not in index_data['sortable_columns']:
+            secondary_column = secondary_condition["column"]
+            if secondary_column not in index_data["sortable_columns"]:
                 continue
-            secondary_index = index_data['sortable_columns'][secondary_column]
+            secondary_index = index_data["sortable_columns"][secondary_column]
             if secondary_index not in index_condition_counts:
-                index_condition_counts[secondary_index] = {'count': 0, 'condition_indexes': []}
-            index_condition_counts[secondary_index]['count'] += 1
-            index_condition_counts[secondary_index]['condition_indexes'].append(condition_index)
+                index_condition_counts[secondary_index] = {"count": 0, "condition_indexes": []}
+            index_condition_counts[secondary_index]["count"] += 1
+            index_condition_counts[secondary_index]["condition_indexes"].append(condition_index)
 
         # now we can decide which index to use.  Prefer an index that hits some secondary conditions,
         # or an index that hits the sort column, or the default index.
         used_condition_indexes = [primary_condition_index]
         if index_condition_counts:
-            index_to_use = max(index_condition_counts, key=lambda key: index_condition_counts[key]['count'])
-            used_condition_indexes.extend(index_condition_counts[index_to_use]['condition_indexes'])
-        elif sort_column in index_data['sortable_columns']:
-            index_to_use = index_data['sortable_columns'][sort_column]
+            index_to_use = max(index_condition_counts, key=lambda key: index_condition_counts[key]["count"])
+            used_condition_indexes.extend(index_condition_counts[index_to_use]["condition_indexes"])
+        elif sort_column in index_data["sortable_columns"]:
+            index_to_use = index_data["sortable_columns"][sort_column]
         else:
-            index_to_use = index_data['default_index_name']
+            index_to_use = index_data["default_index_name"]
 
         # now build our key expression.  For every condition in used_condition_indexes, add it to
         # a key expression, and remove it from the conditions array.  Do this backwards to make sure
@@ -393,11 +388,12 @@ class DynamoDBBackend(Backend):
         key_condition_expression = None
         for condition_index in used_condition_indexes:
             condition = conditions[condition_index]
-            dynamodb_operator_method = self._index_operators[condition['operator']]
-            raw_search_value = condition['values'][0] if condition['values'] else None
-            value = self._value_for_condition_expression(raw_search_value, condition['column'], model)
-            condition_expression = getattr(dynamodb_conditions.Key(condition['column']),
-                                           dynamodb_operator_method)(value)
+            dynamodb_operator_method = self._index_operators[condition["operator"]]
+            raw_search_value = condition["values"][0] if condition["values"] else None
+            value = self._value_for_condition_expression(raw_search_value, condition["column"], model)
+            condition_expression = getattr(dynamodb_conditions.Key(condition["column"]), dynamodb_operator_method)(
+                value
+            )
             # add to our key condition expression
             if key_condition_expression is None:
                 key_condition_expression = condition_expression
@@ -416,27 +412,27 @@ class DynamoDBBackend(Backend):
     def _as_attr_filter_expressions(self, conditions, model):
         filter_expression = None
         for condition in conditions:
-            operator = condition['operator']
-            value = condition['values'][0] if condition['values'] else None
-            column_name = condition['column']
+            operator = condition["operator"]
+            value = condition["values"][0] if condition["values"] else None
+            column_name = condition["column"]
             if operator not in self._attribute_operators:
                 raise ValueError(
                     f"I was asked to filter by operator '{operator}' but this operator is not supported by DynamoDB"
                 )
 
             # a couple of our operators require special handling
-            if operator == 'LIKE':
-                if value[0] != '%' and value[-1] == '%':
-                    condition_expression = dynamodb_conditions.Attr(column_name).begins_with(value.rstrip('%'))
-                elif value[0] == '%' and value[-1] != '%':
+            if operator == "LIKE":
+                if value[0] != "%" and value[-1] == "%":
+                    condition_expression = dynamodb_conditions.Attr(column_name).begins_with(value.rstrip("%"))
+                elif value[0] == "%" and value[-1] != "%":
                     raise ValueError("DynamoDB doesn't support the 'ends_with' operator")
-                elif value[0] == '%' and value[-1] == '%':
-                    condition_expression = dynamodb_conditions.Attr(column_name).contains(value.strip('%'))
+                elif value[0] == "%" and value[-1] == "%":
+                    condition_expression = dynamodb_conditions.Attr(column_name).contains(value.strip("%"))
                 else:
                     condition_expression = dynamodb_conditions.Attr(column_name).eq(value)
-            elif operator == 'IS NULL':
+            elif operator == "IS NULL":
                 condition_expression = dynamodb_conditions.Attr(column_name).exists()
-            elif operator == 'IS NOT NULL':
+            elif operator == "IS NOT NULL":
                 condition_expression = dynamodb_conditions.Attr(column_name).not_exists()
             else:
                 dynamodb_operator = self._attribute_operators[operator]
@@ -466,7 +462,7 @@ class DynamoDBBackend(Backend):
         return value
 
     def _get_indexes_for_model(self, model):
-        """ Loads up the indexes for the DynamoDB table for the given model """
+        """Load indexes for the DynamoDB table for the given model."""
         if model.table_name() in self._table_indexes:
             return self._table_indexes[model.table_name()]
 
@@ -490,7 +486,7 @@ class DynamoDBBackend(Backend):
         schemas = []
         # the primary index for the table doesn't have a name, and it will be used by default
         # if we don't specify an index name. Therefore, we just pass around None for it's name
-        schemas.append({'IndexName': None, 'KeySchema': table.key_schema})
+        schemas.append({"IndexName": None, "KeySchema": table.key_schema})
         global_secondary_indexes = table.global_secondary_indexes
         local_secondary_indexes = table.local_secondary_indexes
         if global_secondary_indexes is not None:
@@ -498,17 +494,17 @@ class DynamoDBBackend(Backend):
         if local_secondary_indexes is not None:
             schemas.extend(table.local_secondary_indexes)
         for schema in schemas:
-            hash_column = ''
-            range_column = ''
-            for key in schema['KeySchema']:
-                if key['KeyType'] == 'RANGE':
-                    range_column = key['AttributeName']
-                if key['KeyType'] == 'HASH':
-                    hash_column = key['AttributeName']
+            hash_column = ""
+            range_column = ""
+            for key in schema["KeySchema"]:
+                if key["KeyType"] == "RANGE":
+                    range_column = key["AttributeName"]
+                if key["KeyType"] == "HASH":
+                    hash_column = key["AttributeName"]
             if hash_column not in table_indexes:
-                table_indexes[hash_column] = {'default_index_name': schema['IndexName'], 'sortable_columns': {}}
+                table_indexes[hash_column] = {"default_index_name": schema["IndexName"], "sortable_columns": {}}
             if range_column:
-                table_indexes[hash_column]['sortable_columns'][range_column] = schema['IndexName']
+                table_indexes[hash_column]["sortable_columns"][range_column] = schema["IndexName"]
 
         self._table_indexes[model.table_name()] = table_indexes
         return table_indexes
@@ -518,7 +514,7 @@ class DynamoDBBackend(Backend):
         primary_indexes = indexes.get(model.id_column_name)
         if not primary_indexes:
             return None
-        for (column_name, index_name) in primary_indexes['sortable_columns'].items():
+        for column_name, index_name in primary_indexes["sortable_columns"].items():
             # the primary index doesn't have a name, so we want the record with a name of None
             if index_name is None:
                 return column_name
@@ -539,32 +535,32 @@ class DynamoDBBackend(Backend):
 
         for key in self._required_configs:
             if key not in configuration:
-                raise KeyError(f'Missing required configuration key {key}')
+                raise KeyError(f"Missing required configuration key {key}")
 
         for key in self._allowed_configs:
             if key not in configuration:
-                configuration[key] = [] if key[-1] == 's' else ''
+                configuration[key] = [] if key[-1] == "s" else ""
 
         return configuration
 
     def validate_pagination_kwargs(self, kwargs: Dict[str, Any], case_mapping: Callable) -> str:
         extra_keys = set(kwargs.keys()) - set(self.allowed_pagination_keys())
         if len(extra_keys):
-            key_name = case_mapping('next_token')
+            key_name = case_mapping("next_token")
             return "Invalid pagination key(s): '" + "','".join(extra_keys) + f"'.  Only '{key_name}' is allowed"
-        if 'next_token' not in kwargs:
-            key_name = case_mapping('next_token')
+        if "next_token" not in kwargs:
+            key_name = case_mapping("next_token")
             return f"You must specify '{key_name}' when setting pagination"
         # the next token should be a urlsafe-base64 encoded JSON string
         try:
-            json.loads(base64.urlsafe_b64decode(kwargs['next_token']))
+            json.loads(base64.urlsafe_b64decode(kwargs["next_token"]))
         except:
-            key_name = case_mapping('next_token')
+            key_name = case_mapping("next_token")
             return "The provided '{key_name}' appears to be invalid."
-        return ''
+        return ""
 
     def allowed_pagination_keys(self) -> List[str]:
-        return ['next_token']
+        return ["next_token"]
 
     def restore_next_token_from_config(self, next_token):
         if not next_token:
@@ -575,23 +571,19 @@ class DynamoDBBackend(Backend):
             return None
 
     def serialize_next_token_for_response(self, last_evaluated_key):
-        return base64.urlsafe_b64encode(json.dumps(last_evaluated_key).encode('utf-8')).decode('utf8')
+        return base64.urlsafe_b64encode(json.dumps(last_evaluated_key).encode("utf-8")).decode("utf8")
 
     def documentation_pagination_next_page_response(self, case_mapping: Callable) -> List[Any]:
-        return [AutoDocString(case_mapping('next_token'))]
+        return [AutoDocString(case_mapping("next_token"))]
 
     def documentation_pagination_next_page_example(self, case_mapping: Callable) -> Dict[str, Any]:
-        return {case_mapping('next_token'): ''}
+        return {case_mapping("next_token"): ""}
 
     def documentation_pagination_parameters(self, case_mapping: Callable) -> List[Tuple[Any]]:
-        return [(
-            AutoDocString(case_mapping('next_token'), example=''), 'A token to fetch the next page of results'
-        )]
+        return [(AutoDocString(case_mapping("next_token"), example=""), "A token to fetch the next page of results")]
 
     def column_from_backend(self, column, value):
-        """
-        We have a couple columns we want to override transformations for
-        """
+        """We have a couple columns we want to override transformations for."""
         # We're pretty much ignoring the BOOL type for dynamodb, because it doesn't work in indexes
         # (and 99% of the time when I have a boolean, it gets used in an index).  Therefore,
         # convert boolean values to "0", "1".
@@ -605,9 +597,7 @@ class DynamoDBBackend(Backend):
         return super().column_from_backend(column, value)
 
     def column_to_backend(self, column, backend_data):
-        """
-        We have a couple columns we want to override transformations for
-        """
+        """We have a couple columns we want to override transformations for."""
         # most importantly, there's no need to transform a JSON column in either direction
         if isinstance(column, Boolean):
             if column.name not in backend_data:

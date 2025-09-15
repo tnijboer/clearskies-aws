@@ -1,30 +1,32 @@
+import datetime
+from collections.abc import Sequence
+from types import ModuleType
+from typing import Any, Callable, List, Optional, Union
+
 import boto3
 import clearskies
-import datetime
-
 from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.models import Models
-from collections.abc import Sequence
-from typing import Any, Callable, List, Optional, Union
-from types import ModuleType
 
 from ..di import StandardDependencies
-from .assume_role import AssumeRole
 from .action_aws import ActionAws
+from .assume_role import AssumeRole
+
+
 class SES(ActionAws):
     _name = "ses"
 
     def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
-        """Setup action."""
+        """Set up the SES action."""
         super().__init__(environment, boto3, di)
 
     def configure(
         self,
         sender,
-        to: Optional[Union[list, str,  Callable]] = None,
-        cc: Optional[Union[list, str,  Callable]] = None,
-        bcc: Optional[Union[list, str,  Callable]] = None,
+        to: Optional[Union[list, str, Callable]] = None,
+        cc: Optional[Union[list, str, Callable]] = None,
+        bcc: Optional[Union[list, str, Callable]] = None,
         subject: Optional[str] = None,
         message: Optional[str] = None,
         subject_template: Optional[str] = None,
@@ -80,23 +82,27 @@ class SES(ActionAws):
 
         if subject_template_file:
             import jinja2
+
             with open(subject_template_file, "r", encoding="utf-8") as template:
                 self.subject_template = jinja2.Template(template.read())
         elif subject_template:
             import jinja2
+
             self.subject_template = jinja2.Template(subject_template)
 
         if message_template_file:
             import jinja2
+
             with open(message_template_file, "r", encoding="utf-8") as template:
                 self.message_template = jinja2.Template(template.read())
         elif message_template:
             import jinja2
+
             self.message_template = jinja2.Template(message_template)
 
     def _execute_action(self, client: ModuleType, model: Models) -> None:
         """Send a notification as configured."""
-        utcnow = self.di.build('utcnow')
+        utcnow = self.di.build("utcnow")
 
         tos = self._resolve_destination("to", model)
         if not tos:
@@ -118,10 +124,7 @@ class SES(ActionAws):
                         "Data": self._resolve_message_as_text(model, utcnow),
                     },
                 },
-                "Subject": {
-                    "Charset": "utf-8",
-                    "Data": self._resolve_subject(model, utcnow)
-                },
+                "Subject": {"Charset": "utf-8", "Data": self._resolve_subject(model, utcnow)},
             },
             Source=self.sender,
         )
@@ -144,9 +147,13 @@ class SES(ActionAws):
                     more = [more]
                 for entry in more:
                     if not isinstance(entry, str):
-                        raise ValueError(f"I invoked a callable to fetch the '{name}' addresses for model '{model.__class__.__name__}' but it returned something other than a string.  Callables must return a valid email address or a list of email addresses.")
+                        raise ValueError(
+                            f"I invoked a callable to fetch the '{name}' addresses for model '{model.__class__.__name__}' but it returned something other than a string.  Callables must return a valid email address or a list of email addresses."
+                        )
                     if "@" not in entry:
-                        raise ValueError(f"I invoked a callable to fetch the '{name}' addresses for model '{model.__class__.__name__}' but it returned a non-email address.  Callables must return a valid email address or a list of email addresses.")
+                        raise ValueError(
+                            f"I invoked a callable to fetch the '{name}' addresses for model '{model.__class__.__name__}' but it returned a non-email address.  Callables must return a valid email address or a list of email addresses."
+                        )
                 resolved.extend(more)
                 continue
             if "@" in destination:

@@ -38,9 +38,7 @@ class LambdaAPIGatewayV2(clearskies_aws.input_outputs.LambdaAPIGateway):
 
     def get_client_ip(self):
         # I haven't actually tested with an API gateway yet to figure out which of these works...
-        if hasattr(self._event, "requestContext") and hasattr(
-            self._event.requestContext, "http"
-        ):
+        if hasattr(self._event, "requestContext") and hasattr(self._event.requestContext, "http"):
             if hasattr(self._event.requestContext.http, "sourceIp"):
                 return self._event.requestContext.http.sourceIp
 

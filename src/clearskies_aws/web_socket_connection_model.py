@@ -6,16 +6,13 @@ import clearskies_aws
 
 
 class WebSocketConnectionModel(clearskies.Model):
-
     id_column_name = "connection_id"
 
     connection_id = clearskies.columns.String()
 
     boto3 = clearskies_aws.di.inject.Boto3()
     backend = clearskies_aws.backends.DummyBackend()
-    input_output = clearskies.di.inject.ByClass(
-        clearskies_aws.input_outputs.LambdaAPIGatewayWebSocket
-    )
+    input_output = clearskies.di.inject.ByClass(clearskies_aws.input_outputs.LambdaAPIGatewayWebSocket)
 
     def send(self, message):
         if not self:
@@ -33,9 +30,7 @@ class WebSocketConnectionModel(clearskies.Model):
             endpoint_url = f"https://{domain}/{stage}"
         else:
             endpoint_url = f"https://{domain}"
-        api_gateway = self.boto3.client(
-            "apigatewaymanagementapi", endpoint_url=endpoint_url
-        )
+        api_gateway = self.boto3.client("apigatewaymanagementapi", endpoint_url=endpoint_url)
 
         bytes_message = json.dumps(message).encode("utf-8")
         try:

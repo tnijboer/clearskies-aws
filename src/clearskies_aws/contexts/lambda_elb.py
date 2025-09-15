@@ -1,7 +1,10 @@
-from ..input_outputs import LambdaELB as LambdaELBInputOutput
-from ..di import StandardDependencies
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
+
+from ..di import StandardDependencies
+from ..input_outputs import LambdaELB as LambdaELBInputOutput
+
+
 class LambdaELB(Context):
     def __init__(self, di):
         super().__init__(di)
@@ -11,6 +14,8 @@ class LambdaELB(Context):
             raise ValueError("Cannot execute LambdaELB context without first configuring it")
 
         return self.handler(LambdaELBInputOutput(event, context))
+
+
 def lambda_elb(
     application,
     di_class=StandardDependencies,

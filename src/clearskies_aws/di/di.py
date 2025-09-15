@@ -44,17 +44,12 @@ class Di(DefaultDI):
 
         return boto3
 
-    def provide_parameter_store(
-        self, boto3: ModuleType, environment: Environment
-    ) -> ParameterStore:
+    def provide_parameter_store(self, boto3: ModuleType, environment: Environment) -> ParameterStore:
         # This is just here so that we can auto-inject the secrets into the environment without having
         # to force the developer to define a secrets manager
         return ParameterStore(boto3, environment)
 
-    def provide_boto3_session(
-        self, boto3: ModuleType, environment: Environment
-    ) -> boto3_module.session.Session:
-
+    def provide_boto3_session(self, boto3: ModuleType, environment: Environment) -> boto3_module.session.Session:
         if not environment.get("AWS_REGION", True):
             raise ValueError(
                 "To use AWS Session you must use set AWS_REGION in the .env file or an environment variable"

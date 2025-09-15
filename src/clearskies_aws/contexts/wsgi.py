@@ -19,11 +19,7 @@ class Wsgi(WsgiDependency):
 
     def __init__(
         self,
-        application: (
-            Callable
-            | clearskies.endpoint.Endpoint
-            | clearskies.endpoint_group.EndpointGroup
-        ),
+        application: Callable | clearskies.endpoint.Endpoint | clearskies.endpoint_group.EndpointGroup,
         classes: type | list[type] = [],
         modules: ModuleType | list[ModuleType] = [],
         bindings: dict[str, Any] = {},

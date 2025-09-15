@@ -1,13 +1,17 @@
-from .lambda_api_gateway import LambdaAPIGateway
-from clearskies.handlers.exceptions import ClientError
 import json
+
+from clearskies.handlers.exceptions import ClientError
+
+from .lambda_api_gateway import LambdaAPIGateway
+
+
 class LambdaSqsStandard(LambdaAPIGateway):
     def __init__(self, record, event, context, url=None, method=None):
         self._record = record
         self._context = context
         self._event = event
-        self._path = url if url else ''
-        self._request_method = method.upper() if method else 'GET'
+        self._path = url if url else ""
+        self._request_method = method.upper() if method else "GET"
 
     def respond(self, body, status_code=200):
         pass

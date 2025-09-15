@@ -1,18 +1,20 @@
-import boto3
-import clearskies
 import datetime
 import json
-
-from botocore.exceptions import ClientError
 from collections.abc import Sequence
+from types import ModuleType
+from typing import Callable, List, Optional, cast
+
+import boto3
+import clearskies
+from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.models import Models
-from types import ModuleType
-from typing import List, Optional, Callable, cast
 
 from ..di import StandardDependencies
-from .assume_role import AssumeRole
 from .action_aws import ActionAws
+from .assume_role import AssumeRole
+
+
 class SNS(ActionAws):
     _name = "sns"
 
@@ -28,7 +30,7 @@ class SNS(ActionAws):
         when: Optional[Callable] = None,
         assume_role: Optional[AssumeRole] = None,
     ) -> None:
-        """Configures the action for SNS."""
+        """Configure the SNS action."""
         super().configure(message_callable=message_callable, when=when, assume_role=assume_role)
 
         self.topic = topic

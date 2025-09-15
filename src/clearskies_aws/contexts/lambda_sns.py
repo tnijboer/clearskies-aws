@@ -1,8 +1,10 @@
-from ..input_outputs import LambdaSns as LambdaSnsInputOutput
-from ..di import StandardDependencies
+from clearskies.authentication import public
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
-from clearskies.authentication import public
+
+from ..di import StandardDependencies
+from ..input_outputs import LambdaSns as LambdaSnsInputOutput
+
 
 class LambdaSns(Context):
     def __init__(self, di):
@@ -10,7 +12,7 @@ class LambdaSns(Context):
 
     def finalize_handler_config(self, config):
         return {
-            'authentication': public(),
+            "authentication": public(),
             **config,
         }
 
@@ -21,8 +23,9 @@ class LambdaSns(Context):
         try:
             return self.handler(LambdaSnsInputOutput(event, context, method=method, url=url))
         except Exception as e:
-            print('Failed message ' + event['Records'][0]['Sns']['MessageId'] + '. Error error: ' + str(e))
+            print("Failed message " + event["Records"][0]["Sns"]["MessageId"] + ". Error error: " + str(e))
             raise e
+
 
 def lambda_sns(
     application,

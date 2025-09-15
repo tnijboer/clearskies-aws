@@ -22,9 +22,7 @@ class LambdaAPIGatewayWebSocket(clearskies_aws.input_outputs.LambdaAPIGateway):
             self._event = parse(model=APIGatewayWebSocketConnectEventModel, event=event)
         except ValidationError as e:
             # Catch validation errors and return a 400 response
-            raise ValueError(
-                f"Failed to parse event from APIGatewayWebSocketConnectEventModel: {e}"
-            )
+            raise ValueError(f"Failed to parse event from APIGatewayWebSocketConnectEventModel: {e}")
         self._context = context
         self._request_method = self._event.request_context.http.method
         self._path = self._event.requestContext.http.path

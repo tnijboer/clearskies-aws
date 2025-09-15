@@ -1,15 +1,18 @@
 from clearskies.authentication import public
-from ..input_outputs import LambdaInvocation as LambdaInvocationInputOutput
-from ..di import StandardDependencies
 from clearskies.contexts.build_context import build_context
 from clearskies.contexts.context import Context
+
+from ..di import StandardDependencies
+from ..input_outputs import LambdaInvocation as LambdaInvocationInputOutput
+
+
 class LambdaInvocation(Context):
     def __init__(self, di):
         super().__init__(di)
 
     def finalize_handler_config(self, config):
         return {
-            'authentication': public(),
+            "authentication": public(),
             **config,
         }
 
@@ -23,12 +26,16 @@ class LambdaInvocation(Context):
         if self.handler is None:
             raise ValueError("Cannot execute LambdaInvocation context without first configuring it")
 
-        return self.handler(LambdaInvocationInputOutput(
-            event,
-            context,
-            method=method,
-            url=url,
-        ))
+        return self.handler(
+            LambdaInvocationInputOutput(
+                event,
+                context,
+                method=method,
+                url=url,
+            )
+        )
+
+
 def lambda_invocation(
     application,
     di_class=StandardDependencies,

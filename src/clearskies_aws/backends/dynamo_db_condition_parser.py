@@ -96,7 +96,7 @@ class DynamoDBConditionParser(ConditionParser):
 
     def parse_condition(self, condition: str) -> Dict[str, Any]:
         """
-        Parses a string condition into a structured dictionary.
+        Parse a string condition into a structured dictionary.
 
         The "values" key in the returned dictionary will contain List[AttributeValueTypeDef].
 
@@ -114,9 +114,7 @@ class DynamoDBConditionParser(ConditionParser):
 
         for operator in self.operators:
             try:
-                operator_for_match: str = self.operators_for_matching.get(
-                    operator, operator
-                )
+                operator_for_match: str = self.operators_for_matching.get(operator, operator)
                 index: int = lowercase_condition.index(operator_for_match)
 
                 if matching_index == -1 or index < matching_index:
@@ -134,16 +132,12 @@ class DynamoDBConditionParser(ConditionParser):
             raise ValueError(f"No supported operators found in condition {condition}")
 
         column: str = condition[:matching_index].strip()
-        value: str = condition[
-            matching_index + self.operator_lengths[matching_operator] :
-        ].strip()
+        value: str = condition[matching_index + self.operator_lengths[matching_operator] :].strip()
 
         if len(value) >= 2:
             first_char = value[0]
             last_char = value[-1]
-            if (first_char == "'" and last_char == "'") or (
-                first_char == '"' and last_char == '"'
-            ):
+            if (first_char == "'" and last_char == "'") or (first_char == '"' and last_char == '"'):
                 value = value[1:-1]
 
         raw_values: List[str] = []
@@ -152,8 +146,7 @@ class DynamoDBConditionParser(ConditionParser):
             raw_values = self._parse_condition_list(value) if value else []
         elif matching_operator not in self.operators_without_placeholders and not (
             matching_operator in self.operator_needs_remap
-            and self.operator_needs_remap[matching_operator]
-            in self.operators_without_placeholders
+            and self.operator_needs_remap[matching_operator] in self.operators_without_placeholders
         ):
             raw_values = [value]
 
@@ -165,25 +158,19 @@ class DynamoDBConditionParser(ConditionParser):
                 matching_operator = "begins_with"
                 raw_values = [value[:-1]]
             elif value.startswith("%") and not value.endswith("%"):
-                raise ValueError(
-                    "DynamoDB PartiQL does not directly support 'ends_with'"
-                )
+                raise ValueError("DynamoDB PartiQL does not directly support 'ends_with'")
             else:
                 matching_operator = "="
                 raw_values = [value]
 
-        matching_operator = self.operator_needs_remap.get(
-            matching_operator.lower(), matching_operator
-        )
+        matching_operator = self.operator_needs_remap.get(matching_operator.lower(), matching_operator)
 
         table_name: str = ""
         final_column_name: str = column
         if "." in column:
             table_prefix, column_name_part = column.split(".", 1)
             table_name = table_prefix.strip().replace('"', "").replace("`", "")
-            final_column_name = (
-                column_name_part.strip().replace('"', "").replace("`", "")
-            )
+            final_column_name = column_name_part.strip().replace('"', "").replace("`", "")
         else:
             final_column_name = column.replace('"', "").replace("`", "")
 
@@ -193,9 +180,7 @@ class DynamoDBConditionParser(ConditionParser):
             for val_item in raw_values:
                 parameters.append(self.to_dynamodb_attribute_value(val_item))
 
-        column_for_parsed: str = (
-            f"{table_name}.{final_column_name}" if table_name else final_column_name
-        )
+        column_for_parsed: str = f"{table_name}.{final_column_name}" if table_name else final_column_name
 
         return {
             "table": table_name,
@@ -213,15 +198,11 @@ class DynamoDBConditionParser(ConditionParser):
         self,
         column: str,
         operator: str,
-        values: List[
-            AttributeValueTypeDef
-        ],  # Parameter 'values' is List[AttributeValueTypeDef]
+        values: List[AttributeValueTypeDef],  # Parameter 'values' is List[AttributeValueTypeDef]
         escape: bool = True,
         escape_character: str = '"',
     ) -> str:
-        """
-        Formats a SQL fragment with placeholders for a given column, operator, and parameters.
-        """
+        """Format a SQL fragment with placeholders for a given column, operator, and parameters."""
         quoted_column = column
         if escape:
             parts: List[str] = column.split(".", 1)
@@ -233,9 +214,7 @@ class DynamoDBConditionParser(ConditionParser):
                     f"{escape_character}{cleaned_parts[1]}{escape_character}"
                 )
             else:
-                quoted_column = (
-                    f"{escape_character}{cleaned_parts[0]}{escape_character}"
-                )
+                quoted_column = f"{escape_character}{cleaned_parts[0]}{escape_character}"
 
         upper_case_operator: str = operator.upper()
         lower_case_operator: str = operator.lower()
@@ -253,12 +232,8 @@ class DynamoDBConditionParser(ConditionParser):
 
         raise ValueError(f"Unsupported operator for placeholder generation: {operator}")
 
-    def to_dynamodb_attribute_value(
-        self, value: Any
-    ) -> AttributeValueTypeDef:  # Return type changed
-        """
-        Converts a Python variable into a DynamoDB-formatted attribute value dictionary.
-        """
+    def to_dynamodb_attribute_value(self, value: Any) -> AttributeValueTypeDef:  # Return type changed
+        """Convert a Python variable into a DynamoDB-formatted attribute value dictionary."""
         if isinstance(value, str):
             if value.lower() == "true":
                 return {"BOOL": True}
@@ -285,39 +260,22 @@ class DynamoDBConditionParser(ConditionParser):
             return {"L": [self.to_dynamodb_attribute_value(item) for item in value]}
         elif isinstance(value, dict):
             # Each value in the map will be AttributeValueTypeDef
-            return {
-                "M": {
-                    str(k): self.to_dynamodb_attribute_value(v)
-                    for k, v in value.items()
-                }
-            }
+            return {"M": {str(k): self.to_dynamodb_attribute_value(v) for k, v in value.items()}}
         elif isinstance(value, set):
             if not value:
-                raise ValueError(
-                    "Cannot determine DynamoDB Set type from an empty Python set."
-                )
+                raise ValueError("Cannot determine DynamoDB Set type from an empty Python set.")
             if all(isinstance(item, str) for item in value):
                 return {"SS": sorted(list(value))}
             elif all(isinstance(item, (int, float, Decimal)) for item in value):
                 return {"NS": sorted([str(item) for item in value])}
             elif all(isinstance(item, bytes) for item in value):
-                return {
-                    "BS": sorted(
-                        [base64.b64encode(item).decode("utf-8") for item in value]
-                    )
-                }
-            raise ValueError(
-                "Set contains mixed types or unsupported types for DynamoDB Sets."
-            )
+                return {"BS": sorted([base64.b64encode(item).decode("utf-8") for item in value])}
+            raise ValueError("Set contains mixed types or unsupported types for DynamoDB Sets.")
         else:
-            raise TypeError(
-                f"Unsupported Python type for DynamoDB conversion: {type(value)}"
-            )
+            raise TypeError(f"Unsupported Python type for DynamoDB conversion: {type(value)}")
 
     def _parse_condition_list(self, list_string: str) -> List[str]:
-        """
-        Parses a string representation of a list into a list of strings.
-        """
+        """Parse a string representation of a list into a list of strings."""
         if not list_string.strip():
             return []
 

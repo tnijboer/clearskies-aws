@@ -1,29 +1,31 @@
-import boto3
-import json
 import datetime
+import json
+from collections import OrderedDict
+from collections.abc import Sequence
+from types import ModuleType
+from typing import Callable, List, Optional, Union
 
+import boto3
 from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.model import Model
-from collections.abc import Sequence
-from collections import OrderedDict
-from types import ModuleType
-from typing import List, Optional, Callable, Union
 
 from ..di import StandardDependencies
 from . import assume_role
 from .action_aws import ActionAws
+
+
 class SQS(ActionAws):
     _name = "sqs"
 
     def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
-        """Setup action."""
+        """Set up the SQS action."""
         super().__init__(environment, boto3, di)
 
     def configure(
         self,
-        queue_url: str = '',
-        queue_url_environment_key: str = '',
+        queue_url: str = "",
+        queue_url_environment_key: str = "",
         queue_url_callable: Optional[Callable] = None,
         message_callable: Optional[Callable] = None,
         when: Optional[Callable] = None,
@@ -67,7 +69,9 @@ class SQS(ActionAws):
             if callable(self.message_group_id):
                 message_group_id = self.di.call_function(self.message_group_id, model=model)
                 if not isinstance(message_group_id, str):
-                    raise ValueError(f"I called the message_group_id function for SQS for model '{model.__class__.__name__}' but the value it returned was not a string.  The message group id must be a string.")
+                    raise ValueError(
+                        f"I called the message_group_id function for SQS for model '{model.__class__.__name__}' but the value it returned was not a string.  The message group id must be a string."
+                    )
             else:
                 message_group_id = self.message_group_id
             params["MessageGroupId"] = message_group_id

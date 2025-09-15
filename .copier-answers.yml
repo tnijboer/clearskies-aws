@@ -1,0 +1,14 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v0.0.34
+_src_path: https://github.com/clearskies-py/clearskies-module-template
+author_email: tom.nijboer@cimpress.com
+author_name: Tom Nijboer
+create_backends: true
+create_columns: false
+create_configs: true
+create_endpoints: false
+create_models: false
+docs_modules_location: modules
+module_display_name: Aws
+module_name: aws
+site_base_url: https://clearskies.info
