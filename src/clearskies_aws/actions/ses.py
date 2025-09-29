@@ -6,10 +6,10 @@ from typing import Any, Callable, List, Optional, Union
 import boto3
 import clearskies
 from botocore.exceptions import ClientError
+from clearskies import Model
 from clearskies.environment import Environment
-from clearskies.models import Models
 
-from ..di import StandardDependencies
+from ..di import Di
 from .action_aws import ActionAws
 from .assume_role import AssumeRole
 
@@ -17,7 +17,7 @@ from .assume_role import AssumeRole
 class SES(ActionAws):
     _name = "ses"
 
-    def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
+    def __init__(self, environment: Environment, boto3: boto3, di: Di) -> None:
         """Set up the SES action."""
         super().__init__(environment, boto3, di)
 
@@ -100,7 +100,7 @@ class SES(ActionAws):
 
             self.message_template = jinja2.Template(message_template)
 
-    def _execute_action(self, client: ModuleType, model: Models) -> None:
+    def _execute_action(self, client: ModuleType, model: Model) -> None:
         """Send a notification as configured."""
         utcnow = self.di.build("utcnow")
 

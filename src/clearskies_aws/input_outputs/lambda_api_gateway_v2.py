@@ -14,8 +14,8 @@ import clearskies_aws
 
 
 class LambdaAPIGatewayV2(clearskies_aws.input_outputs.LambdaAPIGateway):
-    _event: APIGatewayProxyEventV2Model
-    _query_parameters: Optional[dict[str, str]] = None
+    _event: APIGatewayProxyEventV2Model  # type: ignore[assignment]
+    _query_parameters: dict[str, str] = {}  # type: ignore[assignment]
 
     def __init__(self, event: dict, context: LambdaContext):
         try:
@@ -27,7 +27,7 @@ class LambdaAPIGatewayV2(clearskies_aws.input_outputs.LambdaAPIGateway):
         self._context = context
         self._request_method = self._event.requestContext.http.method
         self._path = self._event.requestContext.http.path
-        self._query_parameters = self._event.queryStringParameters
+        self._query_parameters = self._event.queryStringParameters or {}
         self._path_parameters = self._event.pathParameters
         self._request_headers = {}
         for key, value in self._event.headers.items():

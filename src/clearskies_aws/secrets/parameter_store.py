@@ -1,40 +1,38 @@
 from botocore.exceptions import ClientError
-from clearskies.secrets.exceptions import NotFound
+from clearskies.secrets.exceptions.not_found import NotFound
+from types_boto3_ssm import SSMClient
+
+from clearskies_aws.di import inject
+from clearskies_aws.secrets import secrets
 
 
-class ParameterStore:
-    _boto3 = None
-    _environment = None
-    _ssm = None
+class ParameterStore(secrets.Secrets):
+    _ssm: SSMClient
 
     def __init__(self, boto3, environment):
-        self._boto3 = boto3
-        self._environment = environment
-        if not self._environment.get("AWS_REGION", True):
-            raise ValueError("To use parameter store you must use set the 'AWS_REGION' environment variable")
-        self._ssm = self._boto3.client("ssm", region_name=self._environment.get("AWS_REGION"))
+        super().__init__()
+        self._ssm = self.boto3.client("ssm", region_name=self.environment.get("AWS_REGION"))
 
-    def create(self, path, value):
+    def create(self, path: str, value: str) -> bool:
         return self.update(path, value)
 
-    def get(self, path, silent_if_not_found=False):
+    def get(self, path: str, silent_if_not_found: bool = False) -> str | None:  # type: ignore[override]
         try:
             result = self._ssm.get_parameter(Name=path, WithDecryption=True)
         except ClientError as e:
-            if e.response["Error"]["Code"] == "ResourceNotFoundException":
+            error = e.response.get("Error", {})
+            if error.get("Code") == "ResourceNotFoundException":
                 if silent_if_not_found:
                     return None
-                raise NotFound(
-                    f"Cound not find secret '{secret_id}' with version '{version}' and stage '{version_stage}'"
-                )
+                raise NotFound(f"Could not find secret '{path}' in parameter store")
             raise e
-        return result["Parameter"]["Value"]
+        return result["Parameter"].get("Value", "")
 
-    def list_secrets(self, path):
+    def list_secrets(self, path: str) -> list[str]:
         response = self._ssm.get_parameters_by_path(Path=path, Recursive=False)
-        return [parameter["Name"] for parameter in response["Parameters"]]
+        return [parameter["Name"] for parameter in response["Parameters"] if "Name" in parameter]
 
-    def update(self, path, value):
+    def update(self, path: str, value: str) -> bool:  # type: ignore[override]
         response = self._ssm.put_parameter(
             Name=path,
             Value=value,
@@ -43,8 +41,8 @@ class ParameterStore:
         )
         return True
 
-    def upsert(self, path, value):
+    def upsert(self, path: str, value: str) -> bool:  # type: ignore[override]
         return self.update(path, value)
 
-    def list_sub_folders(self, path, value):
+    def list_sub_folders(self, path: str, value: str) -> list[str]:  # type: ignore[override]
         raise NotImplementedError("Parameter store doesn't support list_sub_folders.")

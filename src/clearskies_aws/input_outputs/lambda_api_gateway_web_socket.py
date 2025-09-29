@@ -14,7 +14,8 @@ import clearskies_aws
 
 
 class LambdaAPIGatewayWebSocket(clearskies_aws.input_outputs.LambdaAPIGateway):
-    _event: APIGatewayWebSocketConnectEventModel
+    _event: APIGatewayWebSocketConnectEventModel  # type: ignore[assignment]
+    _request_method: str  # type: ignore[assignment]
 
     def __init__(self, event: dict, context: LambdaContext):
         try:
@@ -24,17 +25,15 @@ class LambdaAPIGatewayWebSocket(clearskies_aws.input_outputs.LambdaAPIGateway):
             # Catch validation errors and return a 400 response
             raise ValueError(f"Failed to parse event from APIGatewayWebSocketConnectEventModel: {e}")
         self._context = context
-        self._request_method = self._event.request_context.http.method
-        self._path = self._event.requestContext.http.path
-        self._query_parameters = self._event.queryStringParameters
-        self._path_parameters = self._event.pathParameters
+        self._request_method = self._event.request_context.route_key
+        self._path = ""
+        self._query_parameters = {}
+        self._path_parameters = {}
         self._request_headers = {}
-        for key, value in self._event.headers.items():
-            self._request_headers[key.lower()] = value
 
     def context_specifics(self):
         return {
             "event": self._event,
             "context": self._context,
-            "connection_id": self._event["requestContext"]["connectionId"],
+            "connection_id": self._event.request_context.connection_id,
         }

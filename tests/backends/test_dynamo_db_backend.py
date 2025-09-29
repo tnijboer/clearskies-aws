@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import clearskies
 from boto3.dynamodb import conditions as dynamodb_conditions
 
-from clearskies_aws.di import StandardDependencies
+from clearskies_aws.di import Di
 
 
 class User(clearskies.Model):
@@ -24,7 +24,7 @@ class User(clearskies.Model):
         )
 
 
-class Users(clearskies.Models):
+class Users(clearskies.Model):
     def __init__(self, dynamo_db_backend, columns):
         super().__init__(dynamo_db_backend, columns)
 
@@ -34,7 +34,7 @@ class Users(clearskies.Models):
 
 class DynamoDBBackendTest(unittest.TestCase):
     def setUp(self):
-        self.di = StandardDependencies()
+        self.di = Di()
         self.di.bind("environment", {"AWS_REGION": "us-east-2"})
         self.dynamo_db_table = SimpleNamespace(
             key_schema=[{"KeyType": "HASH", "AttributeName": "id"}],

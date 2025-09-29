@@ -1,4 +1,4 @@
-from ...actions.ses import SES as BaseSES
+from clearskies_aws.actions.ses import SES as BaseSES
 
 
 class SES(BaseSES):

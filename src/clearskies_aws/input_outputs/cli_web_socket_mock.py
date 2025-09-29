@@ -1,7 +1,7 @@
 import clearskies
 
 
-class CliWebSocketMock(clearskies.input_outputs.Cli):
+class CLIWebSocketMock(clearskies.input_outputs.Cli):
     def context_specifics(self):
         connection_id = self.json_body().get("connection_id")
         if not connection_id:

@@ -4,12 +4,12 @@ from unittest.mock import MagicMock, call
 import clearskies
 
 from clearskies_aws.actions.ses import SES
-from clearskies_aws.di import StandardDependencies
+from clearskies_aws.di import Di
 
 
 class SESTest(unittest.TestCase):
     def setUp(self):
-        self.di = StandardDependencies()
+        self.di = Di()
         self.di.bind("environment", {"AWS_REGION": "us-east-2"})
         self.ses = MagicMock()
         self.ses.send_email = MagicMock()

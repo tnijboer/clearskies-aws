@@ -2,6 +2,7 @@ import json
 import logging
 from abc import ABC
 from collections import OrderedDict
+from types import ModuleType
 from typing import Callable, Optional
 
 import boto3
@@ -9,9 +10,9 @@ from boto3 import client
 from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.functional import string
-from clearskies.models import Models
+from clearskies.model import Model
 
-from ..di import StandardDependencies
+from ..di import Di
 from .assume_role import AssumeRole
 
 
@@ -20,7 +21,7 @@ class ActionAws(ABC):
     _client: Optional[boto3.client] = None
     _name: Optional[str] = None
 
-    def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
+    def __init__(self, environment: Environment, boto3: ModuleType, di: Di) -> None:
         """Set up the AWS action."""
         self.environment = environment
         self.boto3 = boto3
@@ -53,7 +54,7 @@ class ActionAws(ABC):
                 "You must set either the AWS_REGION or AWS_DEFAULT_REGION environment variable when using AWS actions"
             )
 
-    def __call__(self, model: Models) -> None:
+    def __call__(self, model: Model) -> None:
         """Send a notification as configured."""
         if self.when and not self.di.call_function(self.when, model=model):
             return
@@ -96,11 +97,11 @@ class ActionAws(ABC):
             return region
         return None
 
-    def _execute_action(self, client: boto3.client, model: Models) -> None:
+    def _execute_action(self, client: boto3.client, model: Model) -> None:
         """Run the action."""
         pass
 
-    def get_message_body(self, model: Models) -> str:
+    def get_message_body(self, model: Model) -> str:
         """Retrieve the message for the action."""
         if self.message_callable:
             result = self.di.call_function(self.message_callable, model=model)

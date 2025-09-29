@@ -10,7 +10,7 @@ from botocore.exceptions import ClientError
 from clearskies.environment import Environment
 from clearskies.model import Model
 
-from ..di import StandardDependencies
+from ..di import Di
 from . import assume_role
 from .action_aws import ActionAws
 
@@ -18,7 +18,7 @@ from .action_aws import ActionAws
 class SQS(ActionAws):
     _name = "sqs"
 
-    def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
+    def __init__(self, environment: Environment, boto3: boto3, di: Di) -> None:
         """Set up the SQS action."""
         super().__init__(environment, boto3, di)
 

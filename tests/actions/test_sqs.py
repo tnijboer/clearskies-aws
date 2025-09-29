@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, call
 import clearskies
 
 from clearskies_aws.actions.sqs import SQS
-from clearskies_aws.di import StandardDependencies
+from clearskies_aws.di import Di
 
 
 class User(clearskies.Model):
@@ -24,7 +24,7 @@ class User(clearskies.Model):
 
 class SQSTest(unittest.TestCase):
     def setUp(self):
-        self.di = StandardDependencies()
+        self.di = Di()
         self.di.bind("environment", {"AWS_REGION": "us-east-2"})
         self.users = self.di.build(User)
         self.sqs = MagicMock()

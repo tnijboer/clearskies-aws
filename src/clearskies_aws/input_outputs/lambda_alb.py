@@ -45,7 +45,7 @@ class LambdaALB(clearskies_aws.input_outputs.LambdaAPIGateway):
         }
 
         # Initialize path parameters (ALB events don't have path parameters)
-        self._path_parameters = None
+        self._path_parameters = {}
 
         # Initialize headers in the same way as parent class
         self._request_headers = {}

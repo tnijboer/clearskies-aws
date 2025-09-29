@@ -62,16 +62,18 @@ testpaths = [
     "integration",
 ]
 pythonpath = [
-  "app"
+  "src"
 ]
 
 # This is the dedicated section for uv"s configuration
 [dependency-groups]
 dev = [
     "black>=25.1.0",
+    "mypy>=1.18.1",
     "pre-commit>=4.3.0",
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.10",
-    "types-requests>=2.32.4"
+    "types-boto3[essential,secretsmanager,ssm]>=1.40.40",
+    "types-requests>=2.32.4",
 ]

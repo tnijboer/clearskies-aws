@@ -36,3 +36,6 @@ class LambdaInvocation(LambdaAPIGateway):
 
     def respond(self, body, status_code=200):
         return body.decode("utf-8") if type(body) == bytes else body
+
+    def get_request_headers(self) -> dict[str, str]:
+        return self._request_headers

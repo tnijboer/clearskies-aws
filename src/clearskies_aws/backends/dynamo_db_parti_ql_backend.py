@@ -817,7 +817,11 @@ class DynamoDBPartiQLBackend(CursorBackend):
 
             wheres = configuration.get("wheres", [])
             sorts = configuration.get("sorts")
-            sort_column = sorts[0]["column"] if sorts and len(sorts) > 0 and sorts[0] is not None and "column" in sorts[0] else None
+            sort_column = (
+                sorts[0]["column"]
+                if sorts and len(sorts) > 0 and sorts[0] is not None and "column" in sorts[0]
+                else None
+            )
 
             key_to_check_for_equality: Optional[str] = None
             target_name_for_error_msg: str = table_name_from_config

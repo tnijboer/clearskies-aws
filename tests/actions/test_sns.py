@@ -7,7 +7,7 @@ import boto3
 import clearskies
 
 from clearskies_aws.actions.sns import SNS
-from clearskies_aws.di import StandardDependencies
+from clearskies_aws.di import Di
 
 
 class User(clearskies.Model):
@@ -25,7 +25,7 @@ class User(clearskies.Model):
 
 class SNSTest(unittest.TestCase):
     def setUp(self):
-        self.di = StandardDependencies()
+        self.di = Di()
         self.di.bind("environment", {"AWS_REGION": "us-east-2"})
         self.users = self.di.build(User)
         self.sns = MagicMock()

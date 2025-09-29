@@ -8,29 +8,23 @@ from aws_lambda_powertools.utilities.parser.models import (
     APIGatewayProxyEventModel,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from clearskies.input_outputs.input_output import InputOutput
+from clearskies.input_outputs import InputOutput
 from pydantic import ValidationError
 from pydantic.networks import IPvAnyNetwork
 
 
-class LambdaAPIGateway(InputOutput):
-    _event: APIGatewayProxyEventModel
+class LambdaInputOutput(InputOutput):
     _context: LambdaContext
     _request_headers: dict[str, str]
     _request_method: Literal["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     _resource = None
     _query_parameters: dict[str, Union[str, list[str]]] = {}
-    _path_parameters: dict[str, str] | None = {}
+    _path_parameters: dict[str, str] = {}
     _cached_body = None
     _body_was_cached = False
 
     def __init__(self, event: dict, context: LambdaContext):
-        try:
-            # Manually parse the incoming event into MyEvent model
-            self._event = parse(model=APIGatewayProxyEventModel, event=event)
-        except ValidationError as e:
-            # Catch validation errors and return a 400 response
-            raise ValueError(f"Failed to parse event from ApiGateway: {e}")
+        self._event = event
         self._context = context
         self._request_method = self._event.httpMethod
         self._path = self._event.path

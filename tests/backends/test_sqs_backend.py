@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import clearskies
 
 from clearskies_aws.backends.sqs_backend import SqsBackend
-from clearskies_aws.di import StandardDependencies
+from clearskies_aws.di import Di
 
 
 class User(clearskies.Model):
@@ -26,7 +26,7 @@ class User(clearskies.Model):
 
 class SqsBackendTest(unittest.TestCase):
     def setUp(self):
-        self.di = StandardDependencies()
+        self.di = Di()
         self.di.bind("environment", {"AWS_REGION": "us-east-2"})
         self.sqs = SimpleNamespace(send_message=MagicMock())
         self.boto3 = SimpleNamespace(client=MagicMock(return_value=self.sqs))

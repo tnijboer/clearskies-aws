@@ -7,10 +7,10 @@ from typing import Callable, List, Optional, cast
 import boto3
 import clearskies
 from botocore.exceptions import ClientError
+from clearskies import Model
 from clearskies.environment import Environment
-from clearskies.models import Models
 
-from ..di import StandardDependencies
+from ..di import Di
 from .action_aws import ActionAws
 from .assume_role import AssumeRole
 
@@ -18,7 +18,7 @@ from .assume_role import AssumeRole
 class SNS(ActionAws):
     _name = "sns"
 
-    def __init__(self, environment: Environment, boto3: boto3, di: StandardDependencies) -> None:
+    def __init__(self, environment: Environment, boto3: boto3, di: Di) -> None:
         super().__init__(environment, boto3, di)
 
     def configure(
@@ -48,7 +48,7 @@ class SNS(ActionAws):
         if not topics:
             raise ValueError("You must provide at least one of 'topic', 'topic_environment_key', or 'topic_callable'.")
 
-    def _execute_action(self, client: ModuleType, model: Models) -> None:
+    def _execute_action(self, client: ModuleType, model: Model) -> None:
         """Send a notification as configured."""
         topic_arn = self.get_topic_arn(model)
         if not topic_arn:
@@ -58,7 +58,7 @@ class SNS(ActionAws):
             Message=self.get_message_body(model),
         )
 
-    def get_topic_arn(self, model: Models) -> str:
+    def get_topic_arn(self, model: Model) -> str:
         if self.topic:
             return self.topic
         if self.topic_environment_key:
